@@ -22,7 +22,7 @@ export class PredictionsController {
   }
 
   @Post('whatif')
-  @Roles(UserRole.ADMIN, UserRole.ADVISOR, UserRole.INSTRUCTOR)
+  @Roles(UserRole.ADMIN, UserRole.ADVISOR, UserRole.INSTRUCTOR, UserRole.STUDENT)
   whatIf(@Body() payload: WhatIfDto) {
     return this.predictionsService.whatIf(payload);
   }

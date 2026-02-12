@@ -36,22 +36,34 @@ export function WhatIfPanel({ studentId, baselineFeatures }: WhatIfPanelProps) {
     onSuccess: (data) => setResult(data),
   });
 
+  const simulationBaseline = useMemo(() => {
+    if (Object.keys(baselineFeatures).length > 0) {
+      return baselineFeatures;
+    }
+
+    const fallback: Record<string, number> = {};
+    editableFields.forEach((field) => {
+      fallback[field.key] = 0;
+    });
+    return fallback;
+  }, [baselineFeatures]);
+
   const overrides = useMemo(() => {
     const patch: Record<string, number> = {};
     editableFields.forEach((field) => {
-      const baseline = Number(baselineFeatures[field.key] ?? 0);
+      const baseline = Number(simulationBaseline[field.key] ?? 0);
       const next = Number(formState[field.key]);
       if (Number.isFinite(next) && next !== baseline) {
         patch[field.key] = next;
       }
     });
     return patch;
-  }, [baselineFeatures, formState]);
+  }, [formState, simulationBaseline]);
 
   const submit = () => {
     mutation.mutate({
       studentId,
-      baselineFeatures,
+      baselineFeatures: simulationBaseline,
       overrides,
     });
   };
@@ -84,6 +96,11 @@ export function WhatIfPanel({ studentId, baselineFeatures }: WhatIfPanelProps) {
       <button onClick={submit} disabled={mutation.isPending}>
         {mutation.isPending ? 'Simulating...' : 'Run What-if'}
       </button>
+      {mutation.isError && (
+        <p className="form-error">
+          Could not run what-if simulation. Try changing a slider and run again.
+        </p>
+      )}
 
       {result && (
         <div className="whatif-result">
