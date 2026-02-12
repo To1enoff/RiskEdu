@@ -7,7 +7,7 @@ import {
 
 const normalizedRawKeyMap = FEATURE_DEFINITIONS.reduce(
   (accumulator, definition) => {
-    accumulator[definition.key.toLowerCase()] = definition.key;
+    accumulator[String(definition.key).toLowerCase()] = definition.key;
     definition.rawNames.forEach((rawName) => {
       accumulator[normalizeKey(rawName)] = definition.key;
     });

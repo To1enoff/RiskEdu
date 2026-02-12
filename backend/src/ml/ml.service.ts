@@ -2,6 +2,31 @@ import { BadGatewayException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
+export interface MlExplanation {
+  [key: string]: unknown;
+  featureKey: string;
+  displayName: string;
+  contribution: number;
+  direction: 'increase_risk' | 'decrease_risk';
+  value?: string | number | null;
+}
+
+export interface MlPredictResponse {
+  probability: number;
+  label: number;
+  bucket: 'green' | 'yellow' | 'red';
+  explanations: MlExplanation[];
+}
+
+export interface MlWhatIfResponse {
+  baselineProbability: number;
+  newProbability: number;
+  delta: number;
+  bucket: 'green' | 'yellow' | 'red';
+  changedFeatures: Array<Record<string, unknown>>;
+  explanations: MlExplanation[];
+}
+
 @Injectable()
 export class MlService {
   private readonly client: AxiosInstance;
@@ -14,7 +39,7 @@ export class MlService {
     });
   }
 
-  async predict(features: Record<string, unknown>) {
+  async predict(features: Record<string, unknown>): Promise<MlPredictResponse> {
     try {
       const { data } = await this.client.post('/predict', { features });
       return data;
@@ -26,7 +51,7 @@ export class MlService {
   async whatIf(
     baselineFeatures: Record<string, unknown>,
     overrides: Record<string, unknown>,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<MlWhatIfResponse> {
     try {
       const { data } = await this.client.post('/whatif', { baselineFeatures, overrides });
       return data;

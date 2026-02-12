@@ -1,4 +1,5 @@
 export interface StudentFeatures {
+  [key: string]: string | number | undefined;
   gender?: string;
   age?: number;
   logins?: number;

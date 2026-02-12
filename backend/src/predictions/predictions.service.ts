@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { getRiskBucket } from '../common/utils/risk';
 import { mapRawFeaturesToInternal } from '../common/utils/feature-mapper';
 import { sanitizeInput } from '../common/utils/sanitize';
 import { MlService } from '../ml/ml.service';
@@ -37,7 +38,7 @@ export class PredictionsService {
       studentProfile: profile,
       probability: Number(mlResponse.probability),
       label: Number(mlResponse.label),
-      bucket: mlResponse.bucket,
+      bucket: getRiskBucket(Number(mlResponse.probability)),
       explanations: mlResponse.explanations ?? [],
       featureSnapshot: mappedFeatures,
     });
@@ -45,7 +46,7 @@ export class PredictionsService {
 
     profile.latestProbability = Number(mlResponse.probability);
     profile.latestLabel = Number(mlResponse.label);
-    profile.latestBucket = mlResponse.bucket;
+    profile.latestBucket = getRiskBucket(Number(mlResponse.probability));
     profile.latestExplanations = mlResponse.explanations ?? [];
     profile.lastPredictionAt = new Date();
     profile.features = mappedFeatures;
@@ -97,7 +98,7 @@ export class PredictionsService {
       baselineProbability: Number(mlResponse.baselineProbability),
       delta: Number(mlResponse.delta),
       label: mlResponse.newProbability >= 0.5 ? 1 : 0,
-      bucket: mlResponse.bucket,
+      bucket: getRiskBucket(Number(mlResponse.newProbability)),
       explanations: mlResponse.explanations ?? [],
       changedFeatures: mlResponse.changedFeatures ?? [],
       featureSnapshot: snapshotAfterOverrides,
