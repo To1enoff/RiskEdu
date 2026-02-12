@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { runWhatIf } from '../api/students';
 import { WhatIfResponse } from '../types';
 import { toPercent } from '../utils/format';
@@ -18,6 +18,7 @@ const editableFields = [
 ] as const;
 
 export function WhatIfPanel({ studentId, baselineFeatures }: WhatIfPanelProps) {
+  const queryClient = useQueryClient();
   const [formState, setFormState] = useState<Record<string, number>>({});
   const [result, setResult] = useState<WhatIfResponse | null>(null);
 
@@ -33,7 +34,12 @@ export function WhatIfPanel({ studentId, baselineFeatures }: WhatIfPanelProps) {
 
   const mutation = useMutation({
     mutationFn: runWhatIf,
-    onSuccess: (data) => setResult(data),
+    onSuccess: async (data) => {
+      setResult(data);
+      if (studentId) {
+        await queryClient.invalidateQueries({ queryKey: ['student', studentId] });
+      }
+    },
   });
 
   const simulationBaseline = useMemo(() => {

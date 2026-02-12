@@ -105,6 +105,16 @@ export class PredictionsService {
     });
     await this.predictionsRepository.save(prediction);
 
+    // Persist the latest simulated prediction so profile card reflects recent what-if run.
+    if (profile) {
+      profile.latestProbability = Number(mlResponse.newProbability);
+      profile.latestLabel = Number(mlResponse.newProbability >= 0.5 ? 1 : 0);
+      profile.latestBucket = getRiskBucket(Number(mlResponse.newProbability));
+      profile.latestExplanations = mlResponse.explanations ?? [];
+      profile.lastPredictionAt = new Date();
+      await this.profilesRepository.save(profile);
+    }
+
     return mlResponse;
   }
 
