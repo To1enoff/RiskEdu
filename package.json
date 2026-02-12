@@ -1,0 +1,10 @@
+{
+  "name": "riskedu-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose up --build",
+    "dev:down": "docker compose down -v",
+    "logs": "docker compose logs -f"
+  }
+}
