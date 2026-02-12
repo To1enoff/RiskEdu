@@ -12,7 +12,11 @@ export function AppLayout() {
           <p>Student fail/pass risk intelligence</p>
         </div>
         <nav>
-          <Link to="/dashboard">Dashboard</Link>
+          {user?.role === 'student' && user.studentProfileId ? (
+            <Link to={`/students/${user.studentProfileId}`}>My Profile</Link>
+          ) : (
+            <Link to="/dashboard">Dashboard</Link>
+          )}
         </nav>
         <div className="topbar-user">
           <small>{user?.email}</small>

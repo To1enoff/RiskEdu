@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Navigate } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -16,6 +17,10 @@ import { useAuth } from '../hooks/useAuth';
 
 export function DashboardPage() {
   const { user } = useAuth();
+  if (user?.role === 'student' && user.studentProfileId) {
+    return <Navigate to={`/students/${user.studentProfileId}`} replace />;
+  }
+
   const [riskBucket, setRiskBucket] = useState<'green' | 'yellow' | 'red' | undefined>(undefined);
   const [page, setPage] = useState(1);
 

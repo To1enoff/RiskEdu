@@ -19,6 +19,12 @@ export class User {
   })
   role!: UserRole;
 
+  @Column({ nullable: true })
+  fullName?: string;
+
+  @Column({ nullable: true })
+  studentProfileId?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

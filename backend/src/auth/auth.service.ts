@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { Repository } from 'typeorm';
+import { StudentProfile } from '../students/student-profile.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
 import { LoginDto } from './dto/login.dto';
@@ -13,6 +14,8 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(StudentProfile)
+    private readonly studentProfilesRepository: Repository<StudentProfile>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -27,7 +30,18 @@ export class AuthService {
       email: payload.email,
       passwordHash,
       role: payload.role ?? UserRole.ADVISOR,
+      fullName: payload.fullName,
     });
+
+    if (user.role === UserRole.STUDENT) {
+      const studentProfile = this.studentProfilesRepository.create({
+        externalStudentId: payload.email,
+        fullName: payload.fullName ?? payload.email,
+        features: {},
+      });
+      const savedProfile = await this.studentProfilesRepository.save(studentProfile);
+      user.studentProfileId = savedProfile.id;
+    }
 
     const savedUser = await this.usersRepository.save(user);
     const accessToken = await this.createAccessToken(savedUser);
@@ -38,6 +52,8 @@ export class AuthService {
         id: savedUser.id,
         email: savedUser.email,
         role: savedUser.role,
+        fullName: savedUser.fullName,
+        studentProfileId: savedUser.studentProfileId,
       },
     };
   }
@@ -60,6 +76,8 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: user.role,
+        fullName: user.fullName,
+        studentProfileId: user.studentProfileId,
       },
     };
   }
@@ -69,6 +87,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      studentProfileId: user.studentProfileId,
     });
   }
 }

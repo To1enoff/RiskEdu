@@ -1,10 +1,12 @@
-export type UserRole = 'admin' | 'advisor' | 'instructor';
+export type UserRole = 'admin' | 'advisor' | 'instructor' | 'student';
 export type RiskBucket = 'green' | 'yellow' | 'red';
 
 export interface AuthUser {
   id: string;
   email: string;
   role: UserRole;
+  fullName?: string;
+  studentProfileId?: string;
 }
 
 export interface AuthResponse {

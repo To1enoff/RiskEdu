@@ -11,6 +11,7 @@ export function LoginPage() {
 
   const [email, setEmail] = useState('advisor@riskedu.local');
   const [password, setPassword] = useState('StrongPass123');
+  const [fullName, setFullName] = useState('Student User');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [role, setRole] = useState<UserRole>('advisor');
 
@@ -19,10 +20,14 @@ export function LoginPage() {
       if (mode === 'login') {
         return login(email, password);
       }
-      return register(email, password, role);
+      return register(email, password, role, fullName);
     },
     onSuccess: (session) => {
       applySession(session);
+      if (session.user.role === 'student' && session.user.studentProfileId) {
+        navigate(`/students/${session.user.studentProfileId}`);
+        return;
+      }
       navigate('/dashboard');
     },
   });
@@ -51,14 +56,21 @@ export function LoginPage() {
         </label>
 
         {mode === 'register' && (
-          <label>
-            Role
-            <select value={role} onChange={(event) => setRole(event.target.value as UserRole)}>
-              <option value="advisor">Advisor</option>
-              <option value="instructor">Instructor</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
+          <>
+            <label>
+              Full name
+              <input value={fullName} onChange={(event) => setFullName(event.target.value)} />
+            </label>
+            <label>
+              Role
+              <select value={role} onChange={(event) => setRole(event.target.value as UserRole)}>
+                <option value="student">Student</option>
+                <option value="advisor">Advisor</option>
+                <option value="instructor">Instructor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+          </>
         )}
 
         <button type="submit" disabled={mutation.isPending}>

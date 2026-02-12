@@ -16,4 +16,9 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({ example: 'Jane Student' })
+  @IsOptional()
+  @IsString()
+  fullName?: string;
 }
