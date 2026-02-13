@@ -6,5 +6,9 @@
     "dev": "docker compose up --build",
     "dev:down": "docker compose down -v",
     "logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@vitejs/plugin-react": "^5.1.4"
   }
 }
