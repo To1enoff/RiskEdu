@@ -1,21 +1,26 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { AppLayout } from './components/AppLayout';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { DashboardPage } from './pages/DashboardPage';
-import { LoginPage } from './pages/LoginPage';
-import { StudentPage } from './pages/StudentPage';
+import { DashboardLayout } from './layout/DashboardLayout';
+import { MainLayout } from './layout/MainLayout';
+import { Analytics } from './pages/Analytics';
+import { Dashboard } from './pages/Dashboard';
+import { Landing } from './pages/Landing';
+import { Login } from './pages/Login';
+import { StudentDetails } from './pages/StudentDetails';
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/students/:id" element={<StudentPage />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Route>
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
       </Route>
+
+      <Route element={<DashboardLayout />}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/students/:id" element={<StudentDetails />} />
+        <Route path="/analytics" element={<Analytics />} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

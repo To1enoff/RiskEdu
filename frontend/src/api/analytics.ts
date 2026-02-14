@@ -1,9 +1,9 @@
-import { apiClient } from './client';
 import { FeatureImportanceResponse } from '../types';
+import { apiClient } from './client';
 
-export async function fetchFeatureImportance(department?: string): Promise<FeatureImportanceResponse> {
+export const getFeatureImportance = async (department?: string) => {
   const { data } = await apiClient.get<FeatureImportanceResponse>('/analytics/feature-importance', {
-    params: department ? { department } : {},
+    params: department ? { department } : undefined,
   });
   return data;
-}
+};

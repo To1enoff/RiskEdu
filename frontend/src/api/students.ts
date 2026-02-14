@@ -1,44 +1,33 @@
+import { StudentProfile, StudentsResponse, WhatIfResponse } from '../types';
 import { apiClient } from './client';
-import {
-  PredictResponse,
-  StudentProfile,
-  StudentsResponse,
-  WhatIfResponse,
-} from '../types';
 
-export interface StudentsQuery {
+export interface StudentsQueryParams {
   page?: number;
   limit?: number;
-  riskBucket?: 'green' | 'yellow' | 'red';
   sort?: 'asc' | 'desc';
+  riskBucket?: 'green' | 'yellow' | 'red';
 }
 
-export async function fetchStudents(query: StudentsQuery): Promise<StudentsResponse> {
-  const { data } = await apiClient.get<StudentsResponse>('/students', { params: query });
+export const getStudents = async (params: StudentsQueryParams = {}) => {
+  const { data } = await apiClient.get<StudentsResponse>('/students', { params });
   return data;
-}
+};
 
-export async function fetchStudentById(id: string): Promise<StudentProfile> {
+export const getStudentById = async (id: string) => {
   const { data } = await apiClient.get<StudentProfile>(`/students/${id}`);
   return data;
-}
+};
 
-export async function predictStudent(payload: {
-  studentId?: string;
-  externalStudentId?: string;
-  fullName?: string;
-  department?: string;
-  features: Record<string, unknown>;
-}): Promise<PredictResponse> {
-  const { data } = await apiClient.post<PredictResponse>('/predict', payload);
+export const getMyStudentProfile = async () => {
+  const { data } = await apiClient.get<StudentProfile>('/students/me');
   return data;
-}
+};
 
-export async function runWhatIf(payload: {
+export const runWhatIf = async (payload: {
   studentId?: string;
   baselineFeatures: Record<string, unknown>;
   overrides: Record<string, unknown>;
-}): Promise<WhatIfResponse> {
+}) => {
   const { data } = await apiClient.post<WhatIfResponse>('/whatif', payload);
   return data;
-}
+};

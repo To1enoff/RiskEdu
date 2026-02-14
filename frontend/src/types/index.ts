@@ -33,8 +33,7 @@ export interface StudentProfile {
   latestLabel?: number;
   latestExplanations?: ExplanationItem[];
   lastPredictionAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface StudentsResponse {
@@ -45,27 +44,17 @@ export interface StudentsResponse {
   totalPages: number;
 }
 
-export interface PredictResponse {
-  studentId: string;
-  probability: number;
-  label: number;
-  bucket: RiskBucket;
-  explanations: ExplanationItem[];
-}
-
-export interface WhatIfChangedFeature {
-  featureKey: string;
-  displayName: string;
-  oldValue: string | number | null;
-  newValue: string | number | null;
-}
-
 export interface WhatIfResponse {
   baselineProbability: number;
   newProbability: number;
   delta: number;
   bucket: RiskBucket;
-  changedFeatures: WhatIfChangedFeature[];
+  changedFeatures: Array<{
+    featureKey: string;
+    displayName: string;
+    oldValue: string | number | null;
+    newValue: string | number | null;
+  }>;
   explanations: ExplanationItem[];
 }
 
