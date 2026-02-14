@@ -2,7 +2,7 @@ import { Column, Entity, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeo
 import { CourseWeek } from './course-week.entity';
 
 @Entity('week_submissions')
-@Unique('uq_week_submission_user', ['courseWeekId', 'userId'])
+@Unique('uq_week_submission_user', ['courseWeekId', 'studentId'])
 export class WeekSubmission {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -14,7 +14,7 @@ export class WeekSubmission {
   courseWeek!: CourseWeek;
 
   @Column()
-  userId!: string;
+  studentId!: string;
 
   @Column({ type: 'float', nullable: true })
   quizScore?: number | null;

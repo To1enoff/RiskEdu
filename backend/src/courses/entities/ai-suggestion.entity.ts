@@ -13,7 +13,7 @@ export class AiSuggestion {
   course!: Course;
 
   @Column()
-  userId!: string;
+  studentId!: string;
 
   @Column({ type: 'jsonb', default: [] })
   suggestionsJson!: Array<Record<string, unknown>>;

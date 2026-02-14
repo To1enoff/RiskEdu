@@ -20,19 +20,19 @@ export const DashboardLayout = () => {
             <p className="text-xs text-slate-500">Student fail/pass risk intelligence</p>
           </div>
           <nav className="flex items-center gap-2">
-            {user?.role !== 'student' && (
+            {user?.role === 'admin' && (
               <>
-                <Link to="/dashboard">
-                  <Button variant="outline">Dashboard</Button>
+                <Link to="/admin/dashboard">
+                  <Button variant="outline">Admin Dashboard</Button>
                 </Link>
                 <Link to="/analytics">
                   <Button variant="outline">Analytics</Button>
                 </Link>
               </>
             )}
-            {user?.role === 'student' && user.studentProfileId && (
-              <Link to={`/students/${user.studentProfileId}`}>
-                <Button variant="outline">My Profile</Button>
+            {user?.role === 'student' && (
+              <Link to="/student/dashboard">
+                <Button variant="outline">My Courses</Button>
               </Link>
             )}
             <span className="hidden text-sm text-slate-500 md:inline">{user?.email}</span>

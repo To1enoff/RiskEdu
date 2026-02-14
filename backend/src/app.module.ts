@@ -13,11 +13,10 @@ import { Course } from './courses/entities/course.entity';
 import { ExamSubmission } from './courses/entities/exam-submission.entity';
 import { RiskPrediction } from './courses/entities/risk-prediction.entity';
 import { WeekSubmission } from './courses/entities/week-submission.entity';
+import { WhatIfSimulation } from './courses/entities/what-if-simulation.entity';
 import { MlModule } from './ml/ml.module';
 import { Prediction } from './predictions/prediction.entity';
-import { PredictionsModule } from './predictions/predictions.module';
 import { StudentProfile } from './students/student-profile.entity';
-import { StudentsModule } from './students/students.module';
 import { User } from './users/user.entity';
 
 @Module({
@@ -41,6 +40,7 @@ import { User } from './users/user.entity';
           ExamSubmission,
           RiskPrediction,
           AiSuggestion,
+          WhatIfSimulation,
         ],
         synchronize: true,
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
@@ -50,8 +50,6 @@ import { User } from './users/user.entity';
     }),
     MlModule,
     AuthModule,
-    StudentsModule,
-    PredictionsModule,
     AnalyticsModule,
     CoursesModule,
   ],

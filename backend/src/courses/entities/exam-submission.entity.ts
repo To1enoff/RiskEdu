@@ -3,7 +3,7 @@ import { ExamType } from '../enums/exam-type.enum';
 import { Course } from './course.entity';
 
 @Entity('exam_submissions')
-@Unique('uq_exam_submission_unique', ['courseId', 'userId', 'type'])
+@Unique('uq_exam_submission_unique', ['courseId', 'studentId', 'type'])
 export class ExamSubmission {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -15,7 +15,7 @@ export class ExamSubmission {
   course!: Course;
 
   @Column()
-  userId!: string;
+  studentId!: string;
 
   @Column({
     type: 'enum',

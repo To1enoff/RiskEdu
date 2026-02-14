@@ -81,13 +81,18 @@ export interface CourseWeightInput {
 export interface Course {
   id: string;
   title: string;
-  ownerUserId: string;
-  weeks: number;
+  studentId: string;
   createdAt: string;
+  weightedPercent: number;
+  probabilityFail: number;
+  bucket: RiskBucket;
+  totalAbsences: number;
+  absenceStatus: 'ok' | 'warning' | 'critical' | 'auto_fail';
 }
 
 export interface CourseRiskResponse {
   courseId: string;
+  studentId: string;
   title: string;
   weightedPercent: number;
   remainingWeight: number;
@@ -116,4 +121,67 @@ export interface CourseRiskResponse {
     expectedImpact?: string;
   }>;
   createdAt: string;
+}
+
+export interface CourseWhatIfResponse {
+  courseId: string;
+  studentId: string;
+  baselineProbability: number;
+  newProbability: number;
+  delta: number;
+  bucket: RiskBucket;
+  isAutoFail: boolean;
+  reasons: string[];
+  changedFeatures: Array<{ key: string; newValue: number }>;
+  newWeightedPercent: number;
+}
+
+export interface AdminStudentRiskRow {
+  studentId: string;
+  studentName: string;
+  studentEmail: string | null;
+  courseId: string;
+  courseTitle: string;
+  weightedPercent: number;
+  probabilityFail: number;
+  bucket: RiskBucket;
+  totalAbsences: number;
+  canStillPass: boolean;
+}
+
+export interface AdminStudentsResponse {
+  items: AdminStudentRiskRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface AdminStudentDetailsResponse {
+  id: string;
+  fullName?: string;
+  email: string;
+  role: UserRole;
+  courses: Array<{
+    courseId: string;
+    studentId: string;
+    title: string;
+    weightedPercent: number;
+    remainingWeight: number;
+    maxAchievablePercent: number;
+    canStillPass: boolean;
+    totalAbsences: number;
+    absenceStatus: 'ok' | 'warning' | 'critical' | 'auto_fail';
+    probabilityFail: number;
+    bucket: RiskBucket;
+    isAutoFail: boolean;
+    reasons: string[];
+    suggestions: Array<{
+      title: string;
+      why: string;
+      actions: string[];
+      expectedImpact?: string;
+    }>;
+    createdAt: string;
+  }>;
 }

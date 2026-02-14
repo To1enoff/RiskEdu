@@ -91,26 +91,30 @@ npm run dev:down
 
 ## Core APIs
 
-### Student Risk + What-if
-- `GET /students`
-- `GET /students/:id`
-- `POST /predict`
-- `POST /whatif`
-- `GET /analytics/feature-importance`
+### Student API (course-scoped risk)
+- `GET /student/courses`
+- `POST /student/courses`
+- `GET /student/courses/:courseId`
+- `POST /student/courses/:courseId/syllabus/manual`
+- `POST /student/courses/:courseId/syllabus/upload`
+- `GET /student/courses/:courseId/weights`
+- `POST /student/courses/:courseId/exams`
+- `GET /student/courses/:courseId/exams`
+- `POST /student/courses/:courseId/weeks/:weekNumber/submission`
+- `GET /student/courses/:courseId/weeks`
+- `GET /student/courses/:courseId/risk`
+- `POST /student/courses/:courseId/predict`
+- `POST /student/courses/:courseId/what-if`
+- `GET /student/courses/:courseId/suggestions`
 
-### Weighted Course Workflow (15 weeks)
-- `GET /courses`
-- `POST /courses`
-- `POST /courses/:id/syllabus/manual`
-- `POST /courses/:id/syllabus/upload`
-- `GET /courses/:id/weights`
-- `POST /courses/:id/exams`
-- `GET /courses/:id/exams`
-- `POST /courses/:id/weeks/:weekNumber/submission`
-- `GET /courses/:id/weeks`
-- `GET /courses/:id/risk`
-- `POST /courses/:id/predict`
-- `GET /courses/:id/suggestions`
+### Admin API (read-only aggregated)
+- `GET /admin/students`
+- `GET /admin/students/:studentId`
+- `GET /admin/students/:studentId/courses`
+- `GET /admin/students/:studentId/courses/:courseId/risk`
+
+### Analytics
+- `GET /analytics/feature-importance` (admin)
 
 ## Course Risk Rules
 

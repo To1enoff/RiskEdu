@@ -2,14 +2,27 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { DashboardLayout } from './layout/DashboardLayout';
 import { MainLayout } from './layout/MainLayout';
 import { Analytics } from './pages/Analytics';
-import { CourseExams } from './pages/CourseExams';
-import { CourseRisk } from './pages/CourseRisk';
-import { CourseSyllabus } from './pages/CourseSyllabus';
-import { CourseWeeks } from './pages/CourseWeeks';
-import { Dashboard } from './pages/Dashboard';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { AdminStudentDetails } from './pages/AdminStudentDetails';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
-import { StudentDetails } from './pages/StudentDetails';
+import { StudentCourse } from './pages/StudentCourse';
+import { StudentDashboard } from './pages/StudentDashboard';
+import { useAuth } from './hooks/useAuth';
+
+const RoleDashboardRedirect = () => {
+  const { user, isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  if (user?.role === 'student') {
+    return <Navigate to="/student/dashboard" replace />;
+  }
+  return <Navigate to="/login" replace />;
+};
 
 export default function App() {
   return (
@@ -20,13 +33,12 @@ export default function App() {
       </Route>
 
       <Route element={<DashboardLayout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/students/:id" element={<StudentDetails />} />
+        <Route path="/dashboard" element={<RoleDashboardRedirect />} />
+        <Route path="/student/dashboard" element={<StudentDashboard />} />
+        <Route path="/student/courses/:id" element={<StudentCourse />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/students/:id" element={<AdminStudentDetails />} />
         <Route path="/analytics" element={<Analytics />} />
-        <Route path="/student/courses/:id/syllabus" element={<CourseSyllabus />} />
-        <Route path="/student/courses/:id/weeks" element={<CourseWeeks />} />
-        <Route path="/student/courses/:id/exams" element={<CourseExams />} />
-        <Route path="/student/courses/:id/risk" element={<CourseRisk />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

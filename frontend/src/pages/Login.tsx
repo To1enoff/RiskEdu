@@ -13,7 +13,7 @@ export const Login = () => {
   const { setSession } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('advisor@riskedu.local');
+  const [email, setEmail] = useState('student@riskedu.local');
   const [password, setPassword] = useState('StrongPass123');
   const [fullName, setFullName] = useState('Student User');
   const [role, setRole] = useState<UserRole>('student');
@@ -27,11 +27,11 @@ export const Login = () => {
     },
     onSuccess: (session) => {
       setSession(session);
-      if (session.user.role === 'student' && session.user.studentProfileId) {
-        navigate(`/students/${session.user.studentProfileId}`);
+      if (session.user.role === 'student') {
+        navigate('/student/dashboard');
         return;
       }
-      navigate('/dashboard');
+      navigate('/admin/dashboard');
     },
   });
 
@@ -56,8 +56,6 @@ export const Login = () => {
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="student">Student</option>
-                <option value="advisor">Advisor</option>
-                <option value="instructor">Instructor</option>
                 <option value="admin">Admin</option>
               </select>
             </>

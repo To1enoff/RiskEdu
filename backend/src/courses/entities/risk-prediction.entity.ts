@@ -14,7 +14,7 @@ export class RiskPrediction {
   course!: Course;
 
   @Column()
-  userId!: string;
+  studentId!: string;
 
   @Column({ type: 'float' })
   probabilityFail!: number;

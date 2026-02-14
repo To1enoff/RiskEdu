@@ -25,7 +25,7 @@ async function bootstrap() {
   });
 
   app.use(
-    ['/predict', '/whatif', '/courses/:id/predict'],
+    ['/student/courses/:courseId/predict', '/student/courses/:courseId/what-if'],
     rateLimit({
       windowMs: 60_000,
       max: 20,

@@ -11,6 +11,7 @@ import { CourseWeek } from './course-week.entity';
 import { CourseWeight } from './course-weight.entity';
 import { ExamSubmission } from './exam-submission.entity';
 import { RiskPrediction } from './risk-prediction.entity';
+import { WhatIfSimulation } from './what-if-simulation.entity';
 
 @Entity('courses')
 export class Course {
@@ -18,7 +19,7 @@ export class Course {
   id!: string;
 
   @Column()
-  ownerUserId!: string;
+  studentId!: string;
 
   @Column()
   title!: string;
@@ -37,6 +38,9 @@ export class Course {
 
   @OneToMany(() => AiSuggestion, (suggestion) => suggestion.course)
   aiSuggestions?: AiSuggestion[];
+
+  @OneToMany(() => WhatIfSimulation, (simulation) => simulation.course)
+  whatIfSimulations?: WhatIfSimulation[];
 
   @CreateDateColumn()
   createdAt!: Date;
