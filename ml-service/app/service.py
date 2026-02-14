@@ -97,6 +97,31 @@ class ModelManager:
         assert self._bundle is not None
         return {"features": self._bundle["featureImportance"]}
 
+    def predict_course_risk(self, features: Dict[str, Any]) -> Dict[str, Any]:
+        weighted_percent = _to_float(features.get("weightedPercent"), 0.0)
+        remaining_weight = _to_float(features.get("remainingWeight"), 0.0)
+        max_achievable_percent = _to_float(features.get("maxAchievablePercent"), weighted_percent)
+        total_absences = _to_float(features.get("totalAbsences"), 0.0)
+        absences_rate = _to_float(features.get("absencesRate"), min(total_absences / 30.0, 1.0))
+        missing_weeks_count = _to_float(features.get("missingWeeksCount"), 0.0)
+        exam_completed_ratio = _to_float(features.get("examCompletedRatio"), 0.0)
+        quiz_trend = _to_float(features.get("quizTrend"), 0.0)
+
+        # Lightweight ML-style scorer for course progress features.
+        # Output is used as blended signal with backend heuristic.
+        raw = (
+            2.1 * (1.0 - _clamp(weighted_percent / 100.0, 0.0, 1.0))
+            + 1.6 * _clamp(absences_rate, 0.0, 1.0)
+            + 1.2 * _clamp(missing_weeks_count / 15.0, 0.0, 1.0)
+            + 1.3 * (1.0 - _clamp(max_achievable_percent / 100.0, 0.0, 1.0))
+            + 0.4 * (1.0 - _clamp(exam_completed_ratio, 0.0, 1.0))
+            + 0.3 * max(0.0, -quiz_trend)
+            - 0.2 * _clamp(remaining_weight / 100.0, 0.0, 1.0)
+            - 1.7
+        )
+        probability = 1.0 / (1.0 + float(np.exp(-raw)))
+        return {"probabilityFail": _clamp(probability, 0.0, 1.0)}
+
     def _predict_from_df(self, row_df: pd.DataFrame) -> Dict[str, Any]:
         assert self._bundle is not None
         preprocessor = self._bundle["preprocessor"]
@@ -200,3 +225,17 @@ def _safe_json(value: Any) -> Any:
     if isinstance(value, float) and np.isnan(value):
         return None
     return value
+
+
+def _to_float(value: Any, default: float) -> float:
+    try:
+        parsed = float(value)
+        if np.isfinite(parsed):
+            return parsed
+        return default
+    except (TypeError, ValueError):
+        return default
+
+
+def _clamp(value: float, min_value: float, max_value: float) -> float:
+    return min(max(value, min_value), max_value)

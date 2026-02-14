@@ -1,107 +1,72 @@
 # RiskEdu Monorepo
 
-Production-ready multi-service system for student `fail/pass` risk prediction with:
-- Explainable AI (top local factors for each student risk)
-- What-if simulator (partial metric overrides with immediate risk delta)
+RiskEdu is a multi-service platform for:
+- student `fail/pass` prediction with explainability
+- interactive `what-if` simulation
+- weighted 15-week course tracking with hard fail rules and AI suggestions
 
-## Architecture
+## Services
 
-- `frontend` (React + TypeScript + Vite): advisor/instructor/admin UI.
-- `backend` (NestJS + PostgreSQL): auth (JWT + RBAC), students API, prediction orchestration.
-- `ml-service` (FastAPI + scikit-learn + SHAP): model training/inference/explainability.
-- `postgres`: persistence for users, profiles, predictions.
+- `frontend` (`React + TypeScript + Vite + Tailwind`)
+- `backend` (`NestJS + TypeORM + PostgreSQL + JWT/RBAC`)
+- `ml-service` (`FastAPI + scikit-learn + SHAP`)
+- `postgres` (persistent relational store)
 
-Service communication:
+Request flow:
 1. Frontend calls Backend REST API.
-2. Backend validates/authorizes requests, stores state in Postgres.
-3. Backend calls ML Service (`/predict`, `/whatif`, `/feature-importance`) over HTTP.
-4. ML Service returns probability + bucket + explanations.
+2. Backend validates DTO/auth, persists data in PostgreSQL.
+3. Backend calls ML Service (`/predict`, `/whatif`, `/feature-importance`, `/predict-risk`).
+4. Backend merges ML + hard rules + heuristics and returns final risk output.
 
 ## Project Tree
 
 ```text
 RiskEdu/
   backend/
-    src/
-      analytics/
-      auth/
-      common/
-      ml/
-      predictions/
-      students/
-      users/
-      app.controller.ts
-      app.module.ts
-      app.service.ts
-      main.ts
-    Dockerfile
-    package.json
   frontend/
-    src/
-      api/
-      components/
-      hooks/
-      pages/
-      types/
-      utils/
-      App.tsx
-      main.tsx
-      styles.css
-    Dockerfile
-    package.json
   ml-service/
-    app/
-      config.py
-      data_loader.py
-      explainability.py
-      feature_map.py
-      main.py
-      schemas.py
-      service.py
-      training.py
-      utils.py
-    Dockerfile
-    requirements.txt
   data/
     original/
     train_validate/
     test/
   docker-compose.yml
-  package.json
   README.md
 ```
 
 ## Dataset Layout
 
-Put your files in:
+Place data here:
 
 ```text
-/data/original
-/data/train_validate
-/data/test
+/data/original (csv/json)
+/data/train_validate (csv/json)
+/data/test (csv/json)
 ```
 
-Supported train dataset resolution:
+Training file lookup:
 - `/data/train_validate/csv/<TRAIN_DATASET>`
 - `/data/train_validate/<TRAIN_DATASET>`
 
-Default: `TRAIN_DATASET=none.csv` (imbalanced baseline).  
-To switch to SMOTE/ADASYN variant, change `TRAIN_DATASET` env in `ml-service/.env.example` or runtime env.
+Default: `TRAIN_DATASET=none.csv`.
 
-## Quick Start (Docker Compose)
+## Quick Start
 
-1. Copy your dataset into `data/` folders.
-2. Optional: copy `.env.example` to `.env` and edit values.
+1. Copy your dataset into `data/`.
+2. Copy env templates if needed:
+   - root: `.env.example -> .env`
+   - backend: `backend/.env.example`
+   - frontend: `frontend/.env.example`
+   - ml: `ml-service/.env.example`
 3. Run:
 
 ```bash
 npm run dev
 ```
 
-Endpoints:
+Main URLs:
 - Frontend: `http://localhost:5173`
-- Backend Swagger: `http://localhost:3000/docs`
-- ML Health: `http://localhost:8000/health`
+- Backend docs: `http://localhost:3000/docs`
+- ML health: `http://localhost:8000/health`
 
 Stop:
 
@@ -109,45 +74,90 @@ Stop:
 npm run dev:down
 ```
 
-## Auth and Roles
+## Auth, Roles, Security
 
-- Register: `POST /auth/register`
-- Login: `POST /auth/login`
-- Roles: `admin`, `advisor`, `instructor`
-- RBAC:
-  - `GET /analytics/feature-importance`: admin only
-  - `POST /predict`, `POST /whatif`: admin/advisor/instructor
+- Auth:
+  - `POST /auth/register`
+  - `POST /auth/login`
+- Roles: `admin`, `advisor`, `instructor`, `student`
+- RBAC examples:
+  - `GET /analytics/feature-importance` -> `admin`
+- Security controls:
+  - JWT auth guard
+  - DTO validation
+  - centralized error filter
+  - CORS + rate limit on prediction endpoints
+  - basic input sanitation
 
-## API Surface
+## Core APIs
 
-- `GET /students`  
-  pagination + filter by bucket + sort by risk desc.
-- `GET /students/:id`  
-  student details + latest prediction + explanations.
-- `POST /predict`  
-  input features -> `probability`, `label`, `bucket`, explanations.
-- `POST /whatif`  
-  baseline + partial overrides -> baseline/new probability + delta + changedFeatures.
-- `GET /analytics/feature-importance`  
-  aggregated importance (department-aware when available).
+### Student Risk + What-if
+- `GET /students`
+- `GET /students/:id`
+- `POST /predict`
+- `POST /whatif`
+- `GET /analytics/feature-importance`
 
-## Risk Buckets
+### Weighted Course Workflow (15 weeks)
+- `GET /courses`
+- `POST /courses`
+- `POST /courses/:id/syllabus/manual`
+- `POST /courses/:id/syllabus/upload`
+- `GET /courses/:id/weights`
+- `POST /courses/:id/exams`
+- `GET /courses/:id/exams`
+- `POST /courses/:id/weeks/:weekNumber/submission`
+- `GET /courses/:id/weeks`
+- `GET /courses/:id/risk`
+- `POST /courses/:id/predict`
+- `GET /courses/:id/suggestions`
 
-- `green`: `p < 0.33`
-- `yellow`: `0.33 <= p < 0.66`
-- `red`: `p >= 0.66`
+## Course Risk Rules
 
-## Key Implementation Notes
+- Course duration: exactly `15` weeks.
+- Weights must sum to `100`.
+- Fail conditions:
+  - weighted total `< 50`
+  - `totalAbsences > 30` -> auto fail (`probabilityFail=1`, `bucket=red`)
+  - `maxAchievablePercent < 50` -> auto fail
+- Buckets:
+  - `green`: `p < 0.33`
+  - `yellow`: `0.33 <= p < 0.66`
+  - `red`: `p >= 0.66`
 
-- Raw feature names with spaces/symbols are preserved in mapping and normalized to internal camelCase.
-- Empty strings (`""`) in numeric fields are converted to `NaN`, then median-imputed in preprocessing.
-- Training uses Logistic Regression + Random Forest; best model selected by validation `F1`.
-- Model artifacts are cached in memory and persisted (`joblib`) in `/app/artifacts`.
-- SHAP is used for local explanations with robust fallback if SHAP fails for a given model/input shape.
-- Predict/what-if endpoints are rate-limited and input-sanitized at backend level.
+## ML Notes
 
-## Add New Dataset / Oversampling Variant
+- Empty numeric strings are converted to `NaN` and median-imputed.
+- Baseline models: Logistic Regression + Random Forest, selected by best validation `F1`.
+- Artifacts are cached in memory and persisted under `/app/artifacts`.
+- Local explanations use SHAP (with safe fallback).
+- Course risk ML endpoint:
+  - `POST /predict-risk` with progress features
+  - backend blends: `0.7 * ml + 0.3 * heuristic` (if not auto-fail)
 
-1. Place new CSV into `data/train_validate/csv/`.
-2. Set `TRAIN_DATASET=<your-file>.csv` in `ml-service/.env.example` (or container env).
-3. Restart ML service (or full compose) to retrain and refresh artifacts.
+## Tests
+
+Backend unit tests include:
+- weights sum validation
+- weighted score correctness
+- auto fail (`absences > 30`)
+- auto fail (impossible recovery)
+- risk bucket mapping
+- suggestions generation
+
+Run backend tests:
+
+```bash
+docker compose run --rm backend npm test -- --runInBand
+```
+
+## Change Training Dataset / Oversampling
+
+1. Add file to `data/train_validate/csv/`.
+2. Set `TRAIN_DATASET=<file>.csv` in `ml-service/.env.example` (or env).
+3. Rebuild/restart ML service:
+
+```bash
+docker compose build ml-service
+docker compose up -d ml-service
+```

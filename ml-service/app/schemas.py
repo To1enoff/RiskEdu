@@ -36,3 +36,11 @@ class WhatIfResponse(BaseModel):
     bucket: str
     changedFeatures: List[Dict[str, Any]]
     explanations: List[ExplanationItem]
+
+
+class CourseRiskPredictRequest(BaseModel):
+    features: Dict[str, float] = Field(default_factory=dict)
+
+
+class CourseRiskPredictResponse(BaseModel):
+    probabilityFail: float

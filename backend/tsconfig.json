@@ -15,7 +15,6 @@
     "strict": true,
     "skipLibCheck": true,
     "moduleResolution": "node",
-    "types": ["node"]
+    "types": ["node", "express", "multer", "jest"]
   }
 }
-

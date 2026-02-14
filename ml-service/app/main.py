@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 
-from app.schemas import PredictRequest, PredictResponse, WhatIfRequest, WhatIfResponse
+from app.schemas import (
+    CourseRiskPredictRequest,
+    CourseRiskPredictResponse,
+    PredictRequest,
+    PredictResponse,
+    WhatIfRequest,
+    WhatIfResponse,
+)
 from app.service import ModelManager
 
 app = FastAPI(
@@ -41,3 +48,10 @@ def what_if(payload: WhatIfRequest) -> dict:
 @app.get("/feature-importance")
 def feature_importance() -> dict:
     return model_manager.feature_importance()
+
+
+@app.post("/predict-risk", response_model=CourseRiskPredictResponse)
+def predict_course_risk(payload: CourseRiskPredictRequest) -> dict:
+    if not payload.features:
+        raise HTTPException(status_code=400, detail="features must not be empty")
+    return model_manager.predict_course_risk(payload.features)

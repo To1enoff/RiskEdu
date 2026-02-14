@@ -27,6 +27,21 @@ export interface MlWhatIfResponse {
   explanations: MlExplanation[];
 }
 
+export interface MlCourseRiskFeatures {
+  weightedPercent: number;
+  remainingWeight: number;
+  maxAchievablePercent: number;
+  totalAbsences: number;
+  absencesRate: number;
+  missingWeeksCount: number;
+  examCompletedRatio: number;
+  quizTrend: number;
+}
+
+export interface MlCourseRiskResponse {
+  probabilityFail: number;
+}
+
 @Injectable()
 export class MlService {
   private readonly client: AxiosInstance;
@@ -75,6 +90,15 @@ export class MlService {
       return data;
     } catch {
       return { status: 'down' };
+    }
+  }
+
+  async predictCourseRisk(features: MlCourseRiskFeatures): Promise<MlCourseRiskResponse> {
+    try {
+      const { data } = await this.client.post('/predict-risk', { features });
+      return data;
+    } catch (error) {
+      throw new BadGatewayException('ML course risk request failed');
     }
   }
 }

@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-COPY tsconfig*.json nest-cli.json ./
+COPY tsconfig*.json nest-cli.json jest.config.js ./
 COPY src ./src
 
 RUN npm run build

@@ -69,3 +69,51 @@ export interface FeatureImportanceResponse {
   department: string | null;
   features: FeatureImportanceItem[];
 }
+
+export interface CourseWeightInput {
+  midterm: number;
+  final: number;
+  quizzes: number;
+  assignments: number;
+  projects?: number;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  ownerUserId: string;
+  weeks: number;
+  createdAt: string;
+}
+
+export interface CourseRiskResponse {
+  courseId: string;
+  title: string;
+  weightedPercent: number;
+  remainingWeight: number;
+  maxAchievablePercent: number;
+  canStillPass: boolean;
+  totalAbsences: number;
+  absenceStatus: 'ok' | 'warning' | 'critical' | 'auto_fail';
+  probabilityFail: number;
+  bucket: RiskBucket;
+  isAutoFail: boolean;
+  reasons: string[];
+  features: {
+    weightedPercent: number;
+    remainingWeight: number;
+    maxAchievablePercent: number;
+    totalAbsences: number;
+    absencesRate: number;
+    missingWeeksCount: number;
+    examCompletedRatio: number;
+    quizTrend: number;
+  };
+  suggestions: Array<{
+    title: string;
+    why: string;
+    actions: string[];
+    expectedImpact?: string;
+  }>;
+  createdAt: string;
+}
