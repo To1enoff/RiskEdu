@@ -9,7 +9,11 @@
 }
 
 body {
-  @apply m-0 min-h-screen bg-gradient-to-b from-slate-50 to-indigo-50 text-slate-900 antialiased;
+  background:
+    radial-gradient(1200px 420px at 85% -5%, rgba(59, 130, 246, 0.18), transparent 60%),
+    radial-gradient(900px 360px at 10% -10%, rgba(99, 102, 241, 0.14), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  @apply m-0 min-h-screen text-slate-900 antialiased;
 }
 
 #root {
@@ -34,4 +38,8 @@ body {
 
 .animate-in {
   @apply animate-fadeInUp;
+}
+
+a {
+  @apply transition-colors duration-200;
 }

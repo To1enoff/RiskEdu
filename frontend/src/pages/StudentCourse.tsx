@@ -1,7 +1,8 @@
 import { ChangeEvent, Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  deleteStudentCourse,
   getCourseRisk,
   getCourseSuggestions,
   getCourseWeights,
@@ -36,6 +37,7 @@ const defaultWeights: CourseWeightInput = {
 
 export const StudentCourse = () => {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabKey>('overview');
   const [title, setTitle] = useState('');
@@ -147,6 +149,14 @@ export const StudentCourse = () => {
     mutationFn: () => runCourseWhatIf(id, { overrides: whatIf }),
   });
 
+  const deleteCourseMutation = useMutation({
+    mutationFn: () => deleteStudentCourse(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['student-courses'] });
+      navigate('/student/dashboard');
+    },
+  });
+
   if (courseQuery.isLoading) {
     return <Skeleton className="h-96" />;
   }
@@ -161,24 +171,50 @@ export const StudentCourse = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">{courseQuery.data.title}</h1>
-          <p className="mt-1 text-sm text-slate-500">Course-scoped prediction and simulation.</p>
+      <Card className="hero-bg relative overflow-hidden border-0 p-0 text-white shadow-xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-indigo-300/20 blur-3xl" />
+        <div className="grid gap-6 p-6 md:grid-cols-[1.4fr_1fr] md:p-8">
+          <div>
+            <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl">{courseQuery.data.title}</h1>
+            <p className="mt-2 text-sm text-blue-100">Course-scoped prediction and simulation.</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
+                <p className="text-xs uppercase tracking-wide text-blue-100">Weighted</p>
+                <p className="text-lg font-semibold">{riskQuery.data?.weightedPercent?.toFixed(1) ?? '0.0'}%</p>
+              </div>
+              <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
+                <p className="text-xs uppercase tracking-wide text-blue-100">Risk</p>
+                <p className="text-lg font-semibold">{formatPercent(riskQuery.data?.probabilityFail ?? 0)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
+                <p className="text-xs uppercase tracking-wide text-blue-100">Absences</p>
+                <p className="text-lg font-semibold">{riskQuery.data?.totalAbsences ?? 0}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-start justify-between gap-4 md:items-end">
+            <Link
+              to="/student/dashboard"
+              className="rounded-2xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+            >
+              Back to dashboard
+            </Link>
+            {riskQuery.data && <Badge bucket={riskQuery.data.bucket} />}
+          </div>
         </div>
-        <Link to="/student/dashboard" className="text-sm font-semibold text-blue-600">
-          Back to dashboard
-        </Link>
-      </div>
+      </Card>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 rounded-3xl border border-slate-200/80 bg-white/85 p-2 shadow-soft backdrop-blur-md">
         {(['overview', 'weeks', 'exams', 'risk', 'whatif', 'suggestions'] as TabKey[]).map((item) => (
           <button
             key={item}
             type="button"
             onClick={() => setTab(item)}
             className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
-              tab === item ? 'btn-accent text-white' : 'border border-slate-200 bg-white text-slate-600'
+              tab === item
+                ? 'btn-accent text-white shadow-md'
+                : 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
             }`}
           >
             {item === 'whatif' ? 'What-If' : item === 'suggestions' ? 'AI Suggestions' : item[0].toUpperCase() + item.slice(1)}
@@ -188,10 +224,11 @@ export const StudentCourse = () => {
 
       {tab === 'overview' && (
         <div className="space-y-4">
-          <Card className="p-6">
-            <p className="text-sm text-slate-500">Course title</p>
+          <Card variant="glass" className="flex min-h-[560px] flex-col p-6 md:p-7">
+            <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-700">Course title</p>
             <Input value={title} onChange={(event) => setTitle(event.target.value)} />
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
               <WeightInput label="Midterm %" value={weights.midterm} onChange={onWeight('midterm', setWeights)} />
               <WeightInput label="Final %" value={weights.final} onChange={onWeight('final', setWeights)} />
               <WeightInput label="Quizzes %" value={weights.quizzes} onChange={onWeight('quizzes', setWeights)} />
@@ -201,7 +238,7 @@ export const StudentCourse = () => {
             <p className={`mt-3 text-sm font-semibold ${weightValid ? 'text-emerald-700' : 'text-red-700'}`}>
               Total weight: {totalWeight.toFixed(1)}% {weightValid ? '' : '(must equal 100)'}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               <Button onClick={() => saveSyllabusMutation.mutate()} disabled={!weightValid || saveSyllabusMutation.isPending}>
                 Save Syllabus
               </Button>
@@ -210,15 +247,30 @@ export const StudentCourse = () => {
                 Upload
               </Button>
             </div>
+            </div>
+            <div className="mt-auto flex justify-end pt-8">
+              <Button
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-50"
+                disabled={deleteCourseMutation.isPending}
+                onClick={() => {
+                  const ok = window.confirm(`Delete course "${courseQuery.data.title}"? This cannot be undone.`);
+                  if (!ok) return;
+                  deleteCourseMutation.mutate();
+                }}
+              >
+                {deleteCourseMutation.isPending ? 'Deleting...' : 'Delete Course'}
+              </Button>
+            </div>
           </Card>
         </div>
       )}
 
       {tab === 'weeks' && (
-        <Card className="p-4">
+        <Card variant="glass" className="p-5 md:p-6">
           <div className="grid gap-3 md:grid-cols-2">
             {weeks.map((week) => (
-              <div key={week.weekNumber} className="rounded-2xl border border-slate-200 p-4">
+              <div key={week.weekNumber} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                 <h3 className="font-semibold text-slate-900">Week {week.weekNumber}</h3>
                 <div className="mt-2 grid gap-2">
                   <Input id={`quiz-${week.weekNumber}`} type="number" defaultValue={week.quizScore ?? ''} placeholder="Quiz score" />
@@ -246,7 +298,8 @@ export const StudentCourse = () => {
       )}
 
       {tab === 'exams' && (
-        <Card className="p-6">
+        <Card variant="glass" className="p-6">
+          <p className="mb-3 text-sm text-slate-500">Record exam results for this course.</p>
           <div className="grid gap-3 md:grid-cols-2">
             <Input id="course-midterm" type="number" defaultValue={midterm ?? ''} placeholder="Midterm score" />
             <Input id="course-final" type="number" defaultValue={final ?? ''} placeholder="Final score" />
@@ -266,7 +319,7 @@ export const StudentCourse = () => {
       )}
 
       {tab === 'risk' && (
-        <Card className="p-6">
+        <Card variant="glass" className="p-6">
           {riskQuery.isLoading && <Skeleton className="h-32" />}
           {riskQuery.data && (
             <div className="space-y-3">
@@ -294,7 +347,7 @@ export const StudentCourse = () => {
       )}
 
       {tab === 'whatif' && (
-        <Card className="p-6">
+        <Card variant="glass" className="p-6">
           <div className="grid gap-4 md:grid-cols-2">
             <SliderField label="Quizzes Avg" value={whatIf.quizzesAverage} min={0} max={100} onChange={(value) => setWhatIf((p) => ({ ...p, quizzesAverage: value }))} />
             <SliderField label="Assignments Avg" value={whatIf.assignmentsAverage} min={0} max={100} onChange={(value) => setWhatIf((p) => ({ ...p, assignmentsAverage: value }))} />
@@ -317,10 +370,10 @@ export const StudentCourse = () => {
       )}
 
       {tab === 'suggestions' && (
-        <Card className="p-6">
+        <Card variant="glass" className="p-6">
           <div className="space-y-3">
             {(suggestionsQuery.data?.suggestions ?? []).map((suggestion) => (
-              <div key={suggestion.title} className="rounded-2xl border border-slate-200 p-4">
+              <div key={suggestion.title} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="font-semibold text-slate-900">{suggestion.title}</p>
                 <p className="mt-1 text-sm text-slate-600">{suggestion.why}</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
