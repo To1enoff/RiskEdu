@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Skeleton } from '../components/ui/Skeleton';
+import { Course } from '../types';
 import { formatPercent } from '../utils/format';
 
 export const StudentDashboard = () => {
@@ -26,15 +27,16 @@ export const StudentDashboard = () => {
     },
   });
 
-  if (coursesQuery.isLoading) {
-    return <Skeleton className="h-80" />;
-  }
-
-  if (coursesQuery.isError) {
-    return <p className="text-sm font-medium text-red-600">Failed to load your courses.</p>;
-  }
-
-  const courses = coursesQuery.data ?? [];
+  const rawCourses = Array.isArray(coursesQuery.data)
+    ? coursesQuery.data
+    : ((coursesQuery.data as unknown as { items?: Course[] } | undefined)?.items ?? []);
+  const courses = rawCourses.filter(
+    (course): course is Course =>
+      Boolean(course) &&
+      typeof course.id === 'string' &&
+      typeof course.title === 'string' &&
+      typeof course.probabilityFail === 'number',
+  );
   const stats = useMemo(() => {
     const red = courses.filter((course) => course.bucket === 'red').length;
     const yellow = courses.filter((course) => course.bucket === 'yellow').length;
@@ -44,6 +46,14 @@ export const StudentDashboard = () => {
       : 0;
     return { red, yellow, green, avgRisk };
   }, [courses]);
+
+  if (coursesQuery.isLoading) {
+    return <Skeleton className="h-80" />;
+  }
+
+  if (coursesQuery.isError) {
+    return <p className="text-sm font-medium text-red-600">Failed to load your courses.</p>;
+  }
 
   return (
     <div className="space-y-6">
@@ -110,9 +120,9 @@ export const StudentDashboard = () => {
               <Badge bucket={course.bucket} />
             </div>
             <div className="mt-4 grid gap-2 rounded-2xl border border-white/70 bg-white/60 p-3 text-sm text-slate-600">
-              <p>Weighted: {course.weightedPercent.toFixed(1)}%</p>
+              <p>Weighted: {Number(course.weightedPercent ?? 0).toFixed(1)}%</p>
               <p>Risk: {formatPercent(course.probabilityFail)}</p>
-              <p>Absences: {course.totalAbsences} ({course.absenceStatus})</p>
+              <p>Absences: {course.totalAbsences ?? 0} ({course.absenceStatus ?? 'normal'})</p>
             </div>
             <div className="mt-4 flex items-center justify-between gap-2">
               <p className="text-xs text-slate-500">Open Overview to edit syllabus, weeks, exams and delete this course.</p>
