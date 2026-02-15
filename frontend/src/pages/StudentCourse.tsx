@@ -204,23 +204,22 @@ export const StudentCourse = () => {
           </div>
         </div>
       </Card>
-
       <div className="flex flex-wrap gap-2 rounded-3xl border border-slate-200/80 bg-white/85 p-2 shadow-soft backdrop-blur-md">
-        {(['overview', 'weeks', 'exams', 'risk', 'whatif', 'suggestions'] as TabKey[]).map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => setTab(item)}
-            className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
-              tab === item
-                ? 'btn-accent text-white shadow-md'
-                : 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
-            }`}
-          >
-            {item === 'whatif' ? 'What-If' : item === 'suggestions' ? 'AI Suggestions' : item[0].toUpperCase() + item.slice(1)}
-          </button>
-        ))}
-      </div>
+  {(['overview', 'weeks', 'exams', 'risk', 'whatif', 'suggestions'] as TabKey[]).map((item) => (
+    <button
+      key={item}
+      type="button"
+      onClick={() => setTab(item)}
+      className={`rounded-2xl px-4 py-2 text-sm font-semibold ${
+        tab === item
+          ? 'btn-accent text-white shadow-md'
+          : 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
+      }`}
+    >
+      {item === 'whatif' ? 'What-If' : item === 'suggestions' ? 'AI Suggestions' : item[0].toUpperCase() + item.slice(1)}
+    </button>
+  ))}
+</div>
 
       {tab === 'overview' && (
         <div className="space-y-4">
@@ -388,6 +387,7 @@ export const StudentCourse = () => {
             )}
           </div>
         </Card>
+        
       )}
     </div>
   );

@@ -12,6 +12,13 @@ export const getStudentCourses = async () => {
   const { data } = await apiClient.get<Course[]>('/student/courses');
   return data;
 };
+export const deleteStudentCourse = async (courseId: string) => {
+  const { data } = await apiClient.delete<{ courseId: string; studentId: string; deleted: boolean }>(
+    `/student/courses/${courseId}`,
+  );
+  return data;
+};
+
 
 export const createStudentCourse = async (title: string) => {
   const { data } = await apiClient.post<Course>('/student/courses', { title });
