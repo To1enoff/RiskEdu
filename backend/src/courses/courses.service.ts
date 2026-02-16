@@ -435,11 +435,28 @@ export class CoursesService {
       rows = await this.weightsRepo.find({ where: { courseId } });
     }
     if (rows.length === 0) throw new BadRequestException('Course weights are not configured');
-    const map: Record<CourseComponent, number> = { midterm: 0, final: 0, quizzes: 0, assignments: 0, projects: 0 };
-    for (const row of rows) map[row.componentName] = row.weightPercent;
-    const total = Object.values(map).reduce((sum, value) => sum + value, 0);
-    if (Math.abs(total - 100) > 0.0001) throw new BadRequestException(`Invalid course weights: expected 100, got ${total}`);
-    return map;
+
+    const parseMap = (input: CourseWeight[]) => {
+      const parsed: Record<CourseComponent, number> = { midterm: 0, final: 0, quizzes: 0, assignments: 0, projects: 0 };
+      for (const row of input) parsed[row.componentName] = row.weightPercent;
+      const total = Object.values(parsed).reduce((sum, value) => sum + value, 0);
+      return { parsed, total };
+    };
+
+    let { parsed, total } = parseMap(rows);
+    if (Math.abs(total - 100) > 0.0001) {
+      // Self-heal legacy/broken rows in prod DB to keep student dashboard operational.
+      await this.weightsRepo.delete({ courseId });
+      await this.ensureDefaultWeights(courseId);
+      rows = await this.weightsRepo.find({ where: { courseId } });
+      ({ parsed, total } = parseMap(rows));
+    }
+
+    if (Math.abs(total - 100) > 0.0001) {
+      throw new BadRequestException(`Invalid course weights: expected 100, got ${total}`);
+    }
+
+    return parsed;
   }
 
   private async seedWeeks(courseId: string) {
