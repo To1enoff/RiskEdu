@@ -65,6 +65,7 @@ export class CoursesService {
     this.assertStudent(user);
     const course = await this.coursesRepo.save(this.coursesRepo.create({ studentId: user.sub, title: payload.title }));
     await this.seedWeeks(course.id);
+    await this.ensureDefaultWeights(course.id);
     return this.getCourseCard(course.id, user.sub);
   }
 
@@ -428,7 +429,11 @@ export class CoursesService {
   }
 
   private async getWeightsMap(courseId: string) {
-    const rows = await this.weightsRepo.find({ where: { courseId } });
+    let rows = await this.weightsRepo.find({ where: { courseId } });
+    if (rows.length === 0) {
+      await this.ensureDefaultWeights(courseId);
+      rows = await this.weightsRepo.find({ where: { courseId } });
+    }
     if (rows.length === 0) throw new BadRequestException('Course weights are not configured');
     const map: Record<CourseComponent, number> = { midterm: 0, final: 0, quizzes: 0, assignments: 0, projects: 0 };
     for (const row of rows) map[row.componentName] = row.weightPercent;
@@ -439,6 +444,21 @@ export class CoursesService {
 
   private async seedWeeks(courseId: string) {
     await this.weeksRepo.save(Array.from({ length: 15 }, (_, idx) => this.weeksRepo.create({ courseId, weekNumber: idx + 1 })));
+  }
+
+  // Keeps old/new courses safe even if syllabus hasn't been configured yet.
+  private async ensureDefaultWeights(courseId: string) {
+    const existing = await this.weightsRepo.count({ where: { courseId } });
+    if (existing > 0) return;
+    await this.weightsRepo.save(
+      Object.entries(DEFAULT_WEIGHTS).map(([componentName, weightPercent]) =>
+        this.weightsRepo.create({
+          courseId,
+          componentName: componentName as CourseComponent,
+          weightPercent,
+        }),
+      ),
+    );
   }
 
   private assertStudent(user: RequestUser) {
@@ -464,6 +484,14 @@ function sanitizeWeight(value: number | undefined): number {
   if (!Number.isFinite(next) || next < 0 || next > 100) throw new BadRequestException('Weight must be between 0 and 100');
   return next;
 }
+
+const DEFAULT_WEIGHTS: Record<CourseComponent, number> = {
+  [CourseComponent.MIDTERM]: 30,
+  [CourseComponent.FINAL]: 40,
+  [CourseComponent.QUIZZES]: 20,
+  [CourseComponent.ASSIGNMENTS]: 10,
+  [CourseComponent.PROJECTS]: 0,
+};
 
 function averageOrZero(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
