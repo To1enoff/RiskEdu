@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Build this image from repository root context:
+# Dockerfile path: ml-service/Dockerfile.render
+COPY ml-service/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ml-service/app ./app
+# Include dataset in image for cloud deploy (no local bind mounts on Render).
+COPY data ./data
+
+RUN mkdir -p /app/artifacts
+
+ENV DATA_ROOT=/app/data
+ENV ARTIFACT_DIR=/app/artifacts
+ENV PORT=8000
+
+EXPOSE 8000
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+
