@@ -42,9 +42,8 @@ export const saveManualSyllabus = async (courseId: string, payload: { title?: st
 export const uploadSyllabusFile = async (courseId: string, file: File) => {
   const form = new FormData();
   form.append('file', file);
-  const { data } = await apiClient.post(`/student/courses/${courseId}/syllabus/upload`, form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  // Let the browser set multipart boundary automatically.
+  const { data } = await apiClient.post(`/student/courses/${courseId}/syllabus/upload`, form);
   return data;
 };
 
