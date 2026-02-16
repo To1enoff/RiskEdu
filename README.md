@@ -74,6 +74,63 @@ Stop:
 npm run dev:down
 ```
 
+## Production Deploy (Render + GitHub Pages)
+
+This repo is deployed as:
+- Frontend: GitHub Pages (`https://to1enoff.github.io/RiskEdu/`)
+- Backend: Render Web Service (`https://riskedu-backend.onrender.com`)
+- ML Service: Render Web Service (`https://riskedu-ml-service.onrender.com`)
+- Database: Render PostgreSQL
+
+### 1) Deploy ML service on Render
+
+Recommended config:
+- Runtime: `Docker`
+- Root Directory: `ml-service`
+- Dockerfile Path: `Dockerfile`
+- Health check: `/health`
+
+Required env:
+- `TRAIN_DATASET=none.csv` (or other csv name in `data/train_validate/csv`)
+- `RANDOM_STATE=42`
+
+Verify:
+- `https://riskedu-ml-service.onrender.com/health`
+
+### 2) Deploy backend on Render
+
+Recommended config:
+- Runtime: `Docker`
+- Root Directory: `backend`
+- Dockerfile Path: `Dockerfile`
+- Health check: `/health`
+
+Required env:
+- `PORT=3000`
+- `DATABASE_URL=<render postgres connection string>`
+- `ML_SERVICE_URL=https://riskedu-ml-service.onrender.com`
+- `JWT_SECRET=<strong random secret>`
+- `JWT_EXPIRES_IN=1d`
+- `CORS_ORIGIN=https://to1enoff.github.io`
+- `OPENAI_KEY=` (optional)
+
+Verify:
+- `https://riskedu-backend.onrender.com/health`
+
+### 3) Deploy frontend on GitHub Pages
+
+Set repository variable:
+- `VITE_API_URL=https://riskedu-backend.onrender.com`
+
+Enable:
+- `Settings -> Pages -> Source: GitHub Actions`
+
+Workflow:
+- `.github/workflows/deploy-frontend-gh-pages.yml`
+
+Open:
+- `https://to1enoff.github.io/RiskEdu/`
+
 ## Auth, Roles, Security
 
 - Auth:
@@ -88,6 +145,9 @@ npm run dev:down
   - centralized error filter
   - CORS + rate limit on prediction endpoints
   - basic input sanitation
+
+Production note:
+- Public registration should be student-only. Do not allow public admin self-registration.
 
 ## Core APIs
 
@@ -165,3 +225,21 @@ docker compose run --rm backend npm test -- --runInBand
 docker compose build ml-service
 docker compose up -d ml-service
 ```
+
+## Troubleshooting
+
+- Frontend calls `localhost` in production:
+  - Ensure GitHub variable `VITE_API_URL` points to Render backend URL.
+  - Re-run Pages workflow and hard refresh (`Ctrl+F5`).
+
+- `GET /student/courses` returns `400`:
+  - Usually course weights are missing/invalid in DB.
+  - Backend should auto-seed default weights (30/40/20/10/0).
+
+- `POST /student/courses/:id/syllabus/upload` returns `400`:
+  - Do not set multipart `Content-Type` manually on frontend.
+  - Let browser set boundary automatically.
+
+- Render backend says `No open ports detected`:
+  - Check DB connectivity (`DATABASE_URL`) and startup errors in logs.
+  - Service must successfully initialize TypeORM before listening.
