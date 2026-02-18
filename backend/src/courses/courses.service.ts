@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import axios from 'axios';
 import { RiskBucket } from '../common/enums/risk-bucket.enum';
 import { MlService } from '../ml/ml.service';
 import { User } from '../users/user.entity';
@@ -114,7 +115,7 @@ export class CoursesService {
     this.assertStudent(user);
     if (!file) throw new BadRequestException('Syllabus file is required');
     const course = await this.getStudentCourseOrThrow(courseId, user.sub);
-    const parsed = await parseSyllabusFile(file);
+    const parsed = await parseSyllabusFile(file, process.env.OPENAI_KEY);
     const title = parsed.title ?? course.title;
     const totalWeight = Object.values(parsed.weights).reduce((sum, value) => sum + value, 0);
 
@@ -573,7 +574,10 @@ function toNumericOverrides(payload: Record<string, unknown> | undefined): Recor
   return result;
 }
 
-async function parseSyllabusFile(file: Express.Multer.File): Promise<{ title?: string; weights: Record<CourseComponent, number> }> {
+async function parseSyllabusFile(
+  file: Express.Multer.File,
+  openAiKey?: string,
+): Promise<{ title?: string; weights: Record<CourseComponent, number> }> {
   const extension = (file.originalname.split('.').pop() ?? '').toLowerCase();
   let text = '';
   if (extension === 'txt') {
@@ -594,11 +598,15 @@ async function parseSyllabusFile(file: Express.Multer.File): Promise<{ title?: s
 
   const title = text.split('\n').find((line) => line.trim().length > 0)?.trim();
   const rawPercentWeights: Partial<Record<CourseComponent, number | undefined>> = {
-    midterm: extractWeight(text, 'midterm|mid-term'),
-    final: extractWeight(text, 'final|final\\s+exam'),
-    quizzes: extractWeight(text, 'quizzes|quiz|test|tests'),
-    assignments: extractWeight(text, 'assignments|assignment|homework|lab|labs|coursework'),
-    projects: extractWeight(text, 'projects|project|term\\s+project|presentation'),
+    midterm: extractWeight(text, 'midterm|mid-term', 'first'),
+    final: extractWeight(text, 'final|final\\s+exam', 'first'),
+    quizzes: extractWeight(text, 'quizzes|quiz|test|tests', 'sum'),
+    assignments: extractWeight(
+      text,
+      'assignments|assignment|homework|lab|labs|coursework|practice|field\\s*work|tutorial|classwork',
+      'sum',
+    ),
+    projects: extractWeight(text, 'projects|project|term\\s+project|presentation', 'sum'),
   };
   const weightsFromPercent = normalizeParsedWeights(rawPercentWeights);
 
@@ -608,8 +616,14 @@ async function parseSyllabusFile(file: Express.Multer.File): Promise<{ title?: s
 
   const draftWeightsFromPercent = toDraftWeights(rawPercentWeights);
   const draftPercentTotal = Object.values(draftWeightsFromPercent).reduce((sum, value) => sum + value, 0);
-  if (draftPercentTotal > 0) {
-    return { title, weights: draftWeightsFromPercent };
+
+  // AI fallback for difficult PDF table extraction cases.
+  const aiParsed = await parseSyllabusWithAi(text, openAiKey);
+  if (aiParsed) {
+    return {
+      title: aiParsed.title || title,
+      weights: toDraftWeights(aiParsed.weights),
+    };
   }
 
   // Attendance/participation are mapped into assignments because DB has fixed course components.
@@ -617,15 +631,44 @@ async function parseSyllabusFile(file: Express.Multer.File): Promise<{ title?: s
   if (weightsFromPoints) {
     return { title, weights: weightsFromPoints };
   }
+
+  if (draftPercentTotal > 0) {
+    return { title, weights: draftWeightsFromPercent };
+  }
+
   return { title, weights: toDraftWeights({}) };
 }
 
-function extractWeight(text: string, componentPattern: string): number | undefined {
-  const regex = new RegExp(`(?:${componentPattern})[^\\d]{0,20}(\\d{1,3}(?:\\.\\d+)?)\\s*%?`, 'i');
-  const match = regex.exec(text);
-  if (!match) return undefined;
-  const value = Number(match[1]);
-  return Number.isFinite(value) ? value : undefined;
+function extractWeight(text: string, componentPattern: string, mode: 'first' | 'sum' = 'first'): number | undefined {
+  const matcher = new RegExp(`\\b(?:${componentPattern})\\b`, 'i');
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const values: number[] = [];
+  for (const line of lines) {
+    if (!matcher.test(line)) continue;
+    const parsed = extractLikelyPercentFromLine(line);
+    if (parsed !== undefined) values.push(parsed);
+  }
+
+  if (!values.length) return undefined;
+  if (mode === 'sum') return round2(values.reduce((sum, value) => sum + value, 0));
+  return values[0];
+}
+
+function extractLikelyPercentFromLine(line: string): number | undefined {
+  const explicitPercentMatches = [...line.matchAll(/(\d+(?:\.\d+)?)\s*%/gi)];
+  if (explicitPercentMatches.length > 0) {
+    const value = Number(explicitPercentMatches[explicitPercentMatches.length - 1][1]);
+    return Number.isFinite(value) ? value : undefined;
+  }
+
+  const numericMatches = [...line.matchAll(/(\d+(?:\.\d+)?)/g)].map((match) => Number(match[1]));
+  const usable = numericMatches.filter((value) => Number.isFinite(value) && value >= 0 && value <= 100);
+  if (!usable.length) return undefined;
+  return usable[usable.length - 1];
 }
 
 function normalizeParsedWeights(
@@ -750,4 +793,76 @@ function ensureExactHundred(input: Record<CourseComponent, number>): Record<Cour
 
 function round2(value: number) {
   return Math.round(value * 100) / 100;
+}
+
+async function parseSyllabusWithAi(
+  text: string,
+  openAiKey?: string,
+): Promise<
+  | {
+      title?: string;
+      weights: Partial<Record<CourseComponent, number | undefined>>;
+    }
+  | null
+> {
+  if (!openAiKey) return null;
+  const snippet = text.slice(0, 12000);
+  try {
+    const { data } = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Extract grading components from syllabus text. Return strict JSON only with keys: title, midterm, final, quizzes, assignments, projects. Use numbers 0..100 (percent-like values). If missing, set 0.',
+          },
+          {
+            role: 'user',
+            content: [
+              'Parse this syllabus text and map to course components.',
+              'Rules:',
+              '- Use percent column if present.',
+              '- If repeated rows (e.g., Quiz 1, Quiz 2), SUM them.',
+              '- Map practice/field work/homework/lab/attendance/participation to assignments.',
+              '- Return only one JSON object.',
+              '',
+              snippet,
+            ].join('\n'),
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${openAiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15_000,
+      },
+    );
+
+    const rawText = String(data?.choices?.[0]?.message?.content ?? '{}');
+    const parsed = JSON.parse(rawText) as Record<string, unknown>;
+    return {
+      title: typeof parsed.title === 'string' ? parsed.title : undefined,
+      weights: {
+        midterm: toFiniteNumber(parsed.midterm),
+        final: toFiniteNumber(parsed.final),
+        quizzes: toFiniteNumber(parsed.quizzes),
+        assignments: toFiniteNumber(parsed.assignments),
+        projects: toFiniteNumber(parsed.projects),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function toFiniteNumber(value: unknown): number {
+  const next = Number(value);
+  if (!Number.isFinite(next) || next < 0) return 0;
+  return next > 100 ? 100 : next;
 }
