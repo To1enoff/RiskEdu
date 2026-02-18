@@ -23,6 +23,7 @@ export const CourseSyllabus = () => {
   const [title, setTitle] = useState('');
   const [weights, setWeights] = useState<CourseWeightInput>(defaultWeights);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadMessage, setUploadMessage] = useState('');
 
   const weightsQuery = useQuery({
     queryKey: ['course-weights', id],
@@ -67,9 +68,25 @@ export const CourseSyllabus = () => {
       if (!file) return null;
       return uploadSyllabusFile(id, file);
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data?.title) {
+        setTitle(data.title);
+      }
+      if (data?.weights) {
+        setWeights({
+          midterm: Number(data.weights.midterm ?? 0),
+          final: Number(data.weights.final ?? 0),
+          quizzes: Number(data.weights.quizzes ?? 0),
+          assignments: Number(data.weights.assignments ?? 0),
+          projects: Number(data.weights.projects ?? 0),
+        });
+      }
+      setUploadMessage(data?.message ?? 'Syllabus parsed.');
       setFile(null);
       await queryClient.invalidateQueries({ queryKey: ['course-weights', id] });
+    },
+    onError: () => {
+      setUploadMessage('Failed to parse uploaded syllabus.');
     },
   });
 
@@ -142,7 +159,7 @@ export const CourseSyllabus = () => {
         <Button variant="outline" disabled={!file || uploadMutation.isPending} onClick={() => uploadMutation.mutate()}>
           {uploadMutation.isPending ? 'Uploading...' : 'Upload and parse'}
         </Button>
-        {uploadMutation.isError && <p className="text-sm text-red-600">Failed to parse uploaded syllabus.</p>}
+        {uploadMessage && <p className="text-sm text-slate-600">{uploadMessage}</p>}
       </Card>
     </div>
   );

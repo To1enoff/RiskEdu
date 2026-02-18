@@ -43,7 +43,21 @@ export const uploadSyllabusFile = async (courseId: string, file: File) => {
   const form = new FormData();
   form.append('file', file);
   // Let the browser set multipart boundary automatically.
-  const { data } = await apiClient.post(`/student/courses/${courseId}/syllabus/upload`, form);
+  const { data } = await apiClient.post<{
+    courseId: string;
+    studentId: string;
+    title: string;
+    weights: {
+      midterm: number;
+      final: number;
+      quizzes: number;
+      assignments: number;
+      projects: number;
+    };
+    totalWeight: number;
+    persisted: boolean;
+    message?: string;
+  }>(`/student/courses/${courseId}/syllabus/upload`, form);
   return data;
 };
 

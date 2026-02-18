@@ -115,7 +115,30 @@ export class CoursesService {
     if (!file) throw new BadRequestException('Syllabus file is required');
     const course = await this.getStudentCourseOrThrow(courseId, user.sub);
     const parsed = await parseSyllabusFile(file);
-    return this.setManualSyllabus(user, courseId, { title: parsed.title ?? course.title, weights: parsed.weights });
+    const title = parsed.title ?? course.title;
+    const totalWeight = Object.values(parsed.weights).reduce((sum, value) => sum + value, 0);
+
+    // Autofill behavior: always return parsed values (missing fields as 0),
+    // even when the file does not contain a valid 100% distribution yet.
+    if (Math.abs(totalWeight - 100) > 0.0001) {
+      return {
+        courseId,
+        studentId: user.sub,
+        title,
+        weights: parsed.weights,
+        totalWeight,
+        persisted: false,
+        message: `Parsed syllabus draft loaded. Total is ${totalWeight.toFixed(2)}%. Adjust and Save Syllabus.`,
+      };
+    }
+
+    const saved = await this.setManualSyllabus(user, courseId, { title, weights: parsed.weights });
+    return {
+      ...saved,
+      totalWeight: 100,
+      persisted: true,
+      message: 'Syllabus parsed and saved.',
+    };
   }
 
   async submitExam(user: RequestUser, courseId: string, payload: ExamSubmissionDto) {
@@ -550,7 +573,7 @@ function toNumericOverrides(payload: Record<string, unknown> | undefined): Recor
   return result;
 }
 
-async function parseSyllabusFile(file: Express.Multer.File): Promise<{ title?: string; weights: Record<string, number | undefined> }> {
+async function parseSyllabusFile(file: Express.Multer.File): Promise<{ title?: string; weights: Record<CourseComponent, number> }> {
   const extension = (file.originalname.split('.').pop() ?? '').toLowerCase();
   let text = '';
   if (extension === 'txt') {
@@ -564,17 +587,37 @@ async function parseSyllabusFile(file: Express.Multer.File): Promise<{ title?: s
   } else {
     throw new BadRequestException('Unsupported file format. Use PDF, DOCX, or TXT.');
   }
+
+  if (!text.trim()) {
+    throw new BadRequestException('Could not read text from syllabus file');
+  }
+
   const title = text.split('\n').find((line) => line.trim().length > 0)?.trim();
-  return {
-    title,
-    weights: {
-      midterm: extractWeight(text, 'midterm'),
-      final: extractWeight(text, 'final'),
-      quizzes: extractWeight(text, 'quizzes|quiz'),
-      assignments: extractWeight(text, 'assignments|assignment'),
-      projects: extractWeight(text, 'projects|project'),
-    },
+  const rawPercentWeights: Partial<Record<CourseComponent, number | undefined>> = {
+    midterm: extractWeight(text, 'midterm|mid-term'),
+    final: extractWeight(text, 'final|final\\s+exam'),
+    quizzes: extractWeight(text, 'quizzes|quiz|test|tests'),
+    assignments: extractWeight(text, 'assignments|assignment|homework|lab|labs|coursework'),
+    projects: extractWeight(text, 'projects|project|term\\s+project|presentation'),
   };
+  const weightsFromPercent = normalizeParsedWeights(rawPercentWeights);
+
+  if (weightsFromPercent) {
+    return { title, weights: weightsFromPercent };
+  }
+
+  const draftWeightsFromPercent = toDraftWeights(rawPercentWeights);
+  const draftPercentTotal = Object.values(draftWeightsFromPercent).reduce((sum, value) => sum + value, 0);
+  if (draftPercentTotal > 0) {
+    return { title, weights: draftWeightsFromPercent };
+  }
+
+  // Attendance/participation are mapped into assignments because DB has fixed course components.
+  const weightsFromPoints = deriveWeightsFromPoints(text);
+  if (weightsFromPoints) {
+    return { title, weights: weightsFromPoints };
+  }
+  return { title, weights: toDraftWeights({}) };
 }
 
 function extractWeight(text: string, componentPattern: string): number | undefined {
@@ -583,4 +626,128 @@ function extractWeight(text: string, componentPattern: string): number | undefin
   if (!match) return undefined;
   const value = Number(match[1]);
   return Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeParsedWeights(
+  parsed: Partial<Record<CourseComponent, number | undefined>>,
+): Record<CourseComponent, number> | null {
+  const normalized: Record<CourseComponent, number> = {
+    midterm: sanitizeParsedWeight(parsed.midterm),
+    final: sanitizeParsedWeight(parsed.final),
+    quizzes: sanitizeParsedWeight(parsed.quizzes),
+    assignments: sanitizeParsedWeight(parsed.assignments),
+    projects: sanitizeParsedWeight(parsed.projects),
+  };
+  const total = Object.values(normalized).reduce((sum, value) => sum + value, 0);
+  if (total <= 0 || Math.abs(total - 100) > 0.5) return null;
+  return ensureExactHundred(normalized);
+}
+
+function sanitizeParsedWeight(value: number | undefined): number {
+  const next = Number(value ?? 0);
+  if (!Number.isFinite(next) || next < 0 || next > 100) return 0;
+  return next;
+}
+
+function toDraftWeights(parsed: Partial<Record<CourseComponent, number | undefined>>): Record<CourseComponent, number> {
+  return {
+    midterm: sanitizeParsedWeight(parsed.midterm),
+    final: sanitizeParsedWeight(parsed.final),
+    quizzes: sanitizeParsedWeight(parsed.quizzes),
+    assignments: sanitizeParsedWeight(parsed.assignments),
+    projects: sanitizeParsedWeight(parsed.projects),
+  };
+}
+
+function deriveWeightsFromPoints(text: string): Record<CourseComponent, number> | null {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const points: Record<CourseComponent, number> = {
+    midterm: findComponentPoints(lines, /(midterm|mid-term)/i) ?? 0,
+    final: findComponentPoints(lines, /(final|final exam)/i) ?? 0,
+    quizzes: findComponentPoints(lines, /(quizzes|quiz|tests?|weekly quiz)/i) ?? 0,
+    assignments: findComponentPoints(lines, /(assignments?|homework|labs?|coursework|attendance|participation)/i) ?? 0,
+    projects: findComponentPoints(lines, /(projects?|term project|presentation)/i) ?? 0,
+  };
+
+  const foundTotal = extractTotalPoints(text);
+  const base = foundTotal && foundTotal > 0 ? foundTotal : Object.values(points).reduce((sum, value) => sum + value, 0);
+  if (base <= 0) return null;
+
+  const asPercent: Record<CourseComponent, number> = {
+    midterm: (points.midterm / base) * 100,
+    final: (points.final / base) * 100,
+    quizzes: (points.quizzes / base) * 100,
+    assignments: (points.assignments / base) * 100,
+    projects: (points.projects / base) * 100,
+  };
+  const totalPercent = Object.values(asPercent).reduce((sum, value) => sum + value, 0);
+  if (totalPercent <= 0) return null;
+  return ensureExactHundred(asPercent);
+}
+
+function findComponentPoints(lines: string[], componentRegex: RegExp): number | undefined {
+  for (const line of lines) {
+    if (!componentRegex.test(line)) continue;
+    const points = extractPointsValue(line);
+    if (points !== undefined) return points;
+  }
+  return undefined;
+}
+
+function extractPointsValue(line: string): number | undefined {
+  const explicitPoints =
+    /(?:points?|pts?|marks?)\s*[:=-]?\s*(\d+(?:\.\d+)?)/i.exec(line) ??
+    /(\d+(?:\.\d+)?)\s*(?:points?|pts?|marks?)/i.exec(line);
+  if (explicitPoints) {
+    const value = Number(explicitPoints[1]);
+    if (Number.isFinite(value)) return value;
+  }
+
+  const multiplied = /(\d+(?:\.\d+)?)\s*(?:x|×|\*)\s*(\d+(?:\.\d+)?)/i.exec(line);
+  if (multiplied) {
+    const left = Number(multiplied[1]);
+    const right = Number(multiplied[2]);
+    if (Number.isFinite(left) && Number.isFinite(right)) return left * right;
+  }
+
+  const countOnly = /(\d+(?:\.\d+)?)\s*(?:quizzes?|quiz|assignments?|homework|labs?|projects?|attendance|classes?)/i.exec(
+    line,
+  );
+  if (countOnly) {
+    const value = Number(countOnly[1]);
+    if (Number.isFinite(value)) return value;
+  }
+
+  return undefined;
+}
+
+function extractTotalPoints(text: string): number | undefined {
+  const totalPattern =
+    /total[^.\n\r]{0,50}?(?:points?|pts?|marks?)\s*[:=-]?\s*(\d+(?:\.\d+)?)/i.exec(text) ??
+    /(\d+(?:\.\d+)?)\s*(?:points?|pts?|marks?)[^.\n\r]{0,30}?total/i.exec(text);
+  if (!totalPattern) return undefined;
+  const value = Number(totalPattern[1]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function ensureExactHundred(input: Record<CourseComponent, number>): Record<CourseComponent, number> {
+  const rounded: Record<CourseComponent, number> = {
+    midterm: round2(input.midterm),
+    final: round2(input.final),
+    quizzes: round2(input.quizzes),
+    assignments: round2(input.assignments),
+    projects: round2(input.projects),
+  };
+  const keys: CourseComponent[] = [CourseComponent.FINAL, CourseComponent.MIDTERM, CourseComponent.QUIZZES, CourseComponent.ASSIGNMENTS, CourseComponent.PROJECTS];
+  const total = Object.values(rounded).reduce((sum, value) => sum + value, 0);
+  const delta = round2(100 - total);
+  if (Math.abs(delta) > 0) {
+    const target = keys.find((key) => rounded[key] > 0) ?? CourseComponent.FINAL;
+    rounded[target] = round2(rounded[target] + delta);
+  }
+  return rounded;
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
 }

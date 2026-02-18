@@ -12,11 +12,11 @@ export const DashboardLayout = () => {
 
   return (
     <div className="min-h-screen section-soft">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+      <header className="border-b border-blue-100/70 bg-gradient-to-r from-sky-100/70 via-indigo-50/80 to-blue-100/70 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
           <div>
             <BrandLogo to="/" />
-            <p className="text-xs text-slate-500">Student fail/pass risk intelligence</p>
+            <p className="text-xs text-slate-600">Student fail/pass risk intelligence</p>
           </div>
           <nav className="flex items-center gap-2">
             {user?.role === 'admin' && (
@@ -34,7 +34,7 @@ export const DashboardLayout = () => {
                 <Button variant="outline">My Courses</Button>
               </Link>
             )}
-            <span className="hidden text-sm text-slate-500 md:inline">{user?.email}</span>
+            <span className="hidden text-sm text-slate-600 md:inline">{user?.email}</span>
             <Button onClick={logout} variant="glass">
               Logout
             </Button>

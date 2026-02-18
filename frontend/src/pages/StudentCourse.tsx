@@ -43,6 +43,7 @@ export const StudentCourse = () => {
   const [title, setTitle] = useState('');
   const [weights, setWeights] = useState<CourseWeightInput>(defaultWeights);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadMessage, setUploadMessage] = useState<string>('');
   const [whatIf, setWhatIf] = useState({
     quizzesAverage: 60,
     assignmentsAverage: 60,
@@ -93,9 +94,25 @@ export const StudentCourse = () => {
       if (!file) return null;
       return uploadSyllabusFile(id, file);
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data?.title) {
+        setTitle(data.title);
+      }
+      if (data?.weights) {
+        setWeights({
+          midterm: Number(data.weights.midterm ?? 0),
+          final: Number(data.weights.final ?? 0),
+          quizzes: Number(data.weights.quizzes ?? 0),
+          assignments: Number(data.weights.assignments ?? 0),
+          projects: Number(data.weights.projects ?? 0),
+        });
+      }
+      setUploadMessage(data?.message ?? 'Syllabus parsed.');
       setFile(null);
       await queryClient.invalidateQueries({ queryKey: ['course-weights', id] });
+    },
+    onError: () => {
+      setUploadMessage('Failed to parse syllabus file.');
     },
   });
 
@@ -246,6 +263,7 @@ export const StudentCourse = () => {
                 Upload
               </Button>
             </div>
+            {uploadMessage && <p className="mt-2 text-sm text-slate-600">{uploadMessage}</p>}
             </div>
             <div className="mt-auto flex justify-end pt-8">
               <Button
