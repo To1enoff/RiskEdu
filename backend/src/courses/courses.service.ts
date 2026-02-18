@@ -805,7 +805,11 @@ async function parseSyllabusWithAi(
     }
   | null
 > {
-  if (!openAiKey) return null;
+  if (!openAiKey) {
+    console.log('[syllabus-parser] AI fallback skipped: OPENAI_KEY is not set');
+    return null;
+  }
+  console.log('[syllabus-parser] AI fallback invoked');
   const snippet = text.slice(0, 12000);
   try {
     const { data } = await axios.post(
@@ -846,6 +850,7 @@ async function parseSyllabusWithAi(
 
     const rawText = String(data?.choices?.[0]?.message?.content ?? '{}');
     const parsed = JSON.parse(rawText) as Record<string, unknown>;
+    console.log('[syllabus-parser] AI fallback succeeded');
     return {
       title: typeof parsed.title === 'string' ? parsed.title : undefined,
       weights: {
@@ -857,6 +862,7 @@ async function parseSyllabusWithAi(
       },
     };
   } catch {
+    console.warn('[syllabus-parser] AI fallback failed, continuing with non-AI parsing');
     return null;
   }
 }
