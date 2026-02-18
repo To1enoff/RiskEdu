@@ -1,12 +1,11 @@
 import { Link, Outlet } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
+import { BrandLogo } from '../components/ui/BrandLogo';
 
 export const MainLayout = () => (
   <div className="min-h-screen">
     <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6">
-      <Link to="/" className="text-xl font-bold text-slate-900">
-        RiskEdu
-      </Link>
+      <BrandLogo to="/" />
       <div className="flex items-center gap-2">
         <Link to="/login">
           <Button variant="outline">Login</Button>

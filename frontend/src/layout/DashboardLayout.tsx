@@ -1,6 +1,7 @@
 import { Link, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
+import { BrandLogo } from '../components/ui/BrandLogo';
 
 export const DashboardLayout = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -14,9 +15,7 @@ export const DashboardLayout = () => {
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4">
           <div>
-            <Link to="/" className="text-xl font-bold text-slate-900">
-              RiskEdu
-            </Link>
+            <BrandLogo to="/" />
             <p className="text-xs text-slate-500">Student fail/pass risk intelligence</p>
           </div>
           <nav className="flex items-center gap-2">
