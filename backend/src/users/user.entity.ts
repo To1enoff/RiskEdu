@@ -34,6 +34,12 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   emailVerificationExpiresAt?: Date;
 
+  @Column({ nullable: true })
+  passwordResetCode?: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt?: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 

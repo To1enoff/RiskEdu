@@ -19,3 +19,17 @@ export const verifyEmail = async (email: string, code: string) => {
   const { data } = await apiClient.post<AuthResponse>('/auth/verify-email', { email, code });
   return data;
 };
+
+export const forgotPassword = async (email: string) => {
+  const { data } = await apiClient.post<{ message: string }>('/auth/forgot-password', { email });
+  return data;
+};
+
+export const resetPassword = async (email: string, code: string, newPassword: string) => {
+  const { data } = await apiClient.post<{ message: string }>('/auth/reset-password', {
+    email,
+    code,
+    newPassword,
+  });
+  return data;
+};

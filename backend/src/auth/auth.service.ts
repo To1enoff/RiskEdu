@@ -15,8 +15,10 @@ import { Repository } from 'typeorm';
 import { StudentProfile } from '../students/student-profile.entity';
 import { User } from '../users/user.entity';
 import { UserRole } from '../users/user-role.enum';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 
 @Injectable()
@@ -174,6 +176,39 @@ export class AuthService implements OnModuleInit {
     };
   }
 
+  async forgotPassword(payload: ForgotPasswordDto): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOne({ where: { email: payload.email } });
+    if (!user) {
+      // Do not reveal whether email exists.
+      return { message: 'If this email exists, a reset code was sent.' };
+    }
+
+    user.passwordResetCode = generateVerificationCode();
+    user.passwordResetExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    await this.usersRepository.save(user);
+    await this.sendPasswordResetEmail(user.email, user.passwordResetCode);
+    return { message: 'If this email exists, a reset code was sent.' };
+  }
+
+  async resetPassword(payload: ResetPasswordDto): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOne({ where: { email: payload.email } });
+    if (!user || !user.passwordResetCode || !user.passwordResetExpiresAt) {
+      throw new BadRequestException('Invalid reset request');
+    }
+    if (user.passwordResetExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Reset code expired');
+    }
+    if (user.passwordResetCode !== payload.code) {
+      throw new BadRequestException('Invalid reset code');
+    }
+
+    user.passwordHash = await bcrypt.hash(payload.newPassword, 10);
+    user.passwordResetCode = undefined;
+    user.passwordResetExpiresAt = undefined;
+    await this.usersRepository.save(user);
+    return { message: 'Password was reset successfully.' };
+  }
+
   private async createAccessToken(user: User): Promise<string> {
     return this.jwtService.signAsync({
       sub: user.id,
@@ -184,6 +219,24 @@ export class AuthService implements OnModuleInit {
   }
 
   private async sendVerificationEmail(email: string, code: string) {
+    await this.sendAuthCodeEmail(
+      email,
+      'RiskEdu email verification code',
+      `Your verification code is: ${code}. It expires in 10 minutes.`,
+      `[auth] Verification code for ${email}: ${code}`,
+    );
+  }
+
+  private async sendPasswordResetEmail(email: string, code: string) {
+    await this.sendAuthCodeEmail(
+      email,
+      'RiskEdu password reset code',
+      `Your password reset code is: ${code}. It expires in 10 minutes.`,
+      `[auth] Password reset code for ${email}: ${code}`,
+    );
+  }
+
+  private async sendAuthCodeEmail(email: string, subject: string, text: string, fallbackLog: string) {
     const smtpHost = this.configService.get<string>('SMTP_HOST');
     const smtpPort = Number(this.configService.get<string>('SMTP_PORT') ?? 587);
     const smtpUser = this.configService.get<string>('SMTP_USER');
@@ -191,7 +244,7 @@ export class AuthService implements OnModuleInit {
     const smtpFrom = this.configService.get<string>('SMTP_FROM') ?? smtpUser ?? 'noreply@riskedu.local';
 
     if (!smtpHost || !smtpUser || !smtpPass) {
-      console.log(`[auth] Verification code for ${email}: ${code}`);
+      console.log(fallbackLog);
       return;
     }
 
@@ -206,8 +259,8 @@ export class AuthService implements OnModuleInit {
     await transporter.sendMail({
       from: smtpFrom,
       to: email,
-      subject: 'RiskEdu email verification code',
-      text: `Your verification code is: ${code}. It expires in 10 minutes.`,
+      subject,
+      text,
     });
   }
 }
