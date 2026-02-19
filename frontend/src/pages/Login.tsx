@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { forgotPassword, login, register, resetPassword, verifyEmail } from '../api/auth';
+import axios from 'axios';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
@@ -20,6 +21,7 @@ export const Login = () => {
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const authMutation = useMutation({
     mutationFn: async () => {
@@ -38,6 +40,7 @@ export const Login = () => {
       return resetPassword(email, resetCode, newPassword);
     },
     onSuccess: (result) => {
+      setErrorMessage('');
       if (mode === 'register') {
         setMode('verify');
         setInfoMessage('Verification code sent. Check your email and enter code below.');
@@ -60,6 +63,22 @@ export const Login = () => {
         return;
       }
       navigate('/admin/dashboard');
+    },
+    onError: (error) => {
+      if (!axios.isAxiosError(error)) {
+        setErrorMessage('Authentication failed.');
+        return;
+      }
+      if (error.code === 'ECONNABORTED' || String(error.message).toLowerCase().includes('timeout')) {
+        setErrorMessage('Request timed out. Backend may be waking up on Render. Try again in 20-40 seconds.');
+        return;
+      }
+      const payload = error.response?.data as { message?: string | string[] } | undefined;
+      if (payload?.message) {
+        setErrorMessage(Array.isArray(payload.message) ? payload.message[0] : payload.message);
+        return;
+      }
+      setErrorMessage('Authentication failed.');
     },
   });
 
@@ -149,13 +168,14 @@ export const Login = () => {
         </form>
 
         {infoMessage && <p className="mt-3 text-sm font-medium text-slate-600">{infoMessage}</p>}
-        {authMutation.isError && <p className="mt-3 text-sm font-medium text-red-600">Authentication failed.</p>}
+        {authMutation.isError && <p className="mt-3 text-sm font-medium text-red-600">{errorMessage || 'Authentication failed.'}</p>}
 
         {(mode === 'login' || mode === 'register') && (
           <button
             type="button"
             onClick={() => {
               setInfoMessage('');
+              setErrorMessage('');
               setMode((prev) => (prev === 'login' ? 'register' : 'login'));
             }}
             className="mt-4 text-sm font-semibold text-blue-600"
@@ -168,6 +188,7 @@ export const Login = () => {
             type="button"
             onClick={() => {
               setInfoMessage('');
+              setErrorMessage('');
               setMode('forgot');
             }}
             className="mt-2 text-sm font-semibold text-blue-600"
@@ -180,6 +201,7 @@ export const Login = () => {
             type="button"
             onClick={() => {
               setInfoMessage('');
+              setErrorMessage('');
               setMode('login');
             }}
             className="mt-4 text-sm font-semibold text-blue-600"
