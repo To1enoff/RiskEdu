@@ -14,6 +14,12 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
+export interface RegisterResponse {
+  requiresVerification: true;
+  email: string;
+  message: string;
+}
+
 export interface ExplanationItem {
   featureKey: string;
   displayName: string;

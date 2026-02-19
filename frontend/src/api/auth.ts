@@ -1,4 +1,4 @@
-import { AuthResponse } from '../types';
+import { AuthResponse, RegisterResponse } from '../types';
 import { apiClient } from './client';
 
 export const login = async (email: string, password: string) => {
@@ -7,10 +7,15 @@ export const login = async (email: string, password: string) => {
 };
 
 export const register = async (email: string, password: string, fullName?: string) => {
-  const { data } = await apiClient.post<AuthResponse>('/auth/register', {
+  const { data } = await apiClient.post<RegisterResponse>('/auth/register', {
     email,
     password,
     fullName,
   });
+  return data;
+};
+
+export const verifyEmail = async (email: string, code: string) => {
+  const { data } = await apiClient.post<AuthResponse>('/auth/verify-email', { email, code });
   return data;
 };

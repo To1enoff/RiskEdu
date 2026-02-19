@@ -25,6 +25,15 @@ export class User {
   @Column({ nullable: true })
   studentProfileId?: string;
 
+  @Column({ default: false })
+  emailVerified!: boolean;
+
+  @Column({ nullable: true })
+  emailVerificationCode?: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  emailVerificationExpiresAt?: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 

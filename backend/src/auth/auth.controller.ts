@@ -4,6 +4,7 @@ import { sanitizeInput } from '../common/utils/sanitize';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -18,5 +19,10 @@ export class AuthController {
   @Post('login')
   login(@Body() payload: LoginDto) {
     return this.authService.login(sanitizeInput(payload));
+  }
+
+  @Post('verify-email')
+  verifyEmail(@Body() payload: VerifyEmailDto) {
+    return this.authService.verifyEmail(sanitizeInput(payload));
   }
 }
