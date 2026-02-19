@@ -256,12 +256,20 @@ export class AuthService implements OnModuleInit {
       auth: { user: smtpUser, pass: smtpPass },
     });
 
-    await transporter.sendMail({
-      from: smtpFrom,
-      to: email,
-      subject,
-      text,
-    });
+    try {
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: email,
+        subject,
+        text,
+      });
+    } catch (error) {
+      // Keep auth flows alive even if SMTP provider rejects the message.
+      this.logger.warn(
+        `SMTP send failed for ${email}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      console.log(fallbackLog);
+    }
   }
 }
 
