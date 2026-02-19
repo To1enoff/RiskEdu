@@ -3,12 +3,13 @@ import { useState } from 'react';
 
 export const BrandLogo = ({ to = '/' }: { to?: string }) => {
   const [broken, setBroken] = useState(false);
+  const logoSrc = `${import.meta.env.BASE_URL}logo.png`;
 
   return (
     <Link to={to} className="inline-flex items-center">
       {!broken ? (
         <img
-          src="/logo.png"
+          src={logoSrc}
           alt="RiskEdu"
           className="h-10 w-auto max-w-[220px] object-contain md:h-12"
           onError={() => setBroken(true)}
@@ -19,4 +20,3 @@ export const BrandLogo = ({ to = '/' }: { to?: string }) => {
     </Link>
   );
 };
-
