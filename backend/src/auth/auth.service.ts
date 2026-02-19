@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { Repository } from 'typeorm';
@@ -17,9 +18,15 @@ export class AuthService {
     @InjectRepository(StudentProfile)
     private readonly studentProfilesRepository: Repository<StudentProfile>,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(payload: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {
+    const allowedAdminEmail = (this.configService.get<string>('ADMIN_EMAIL') ?? 'admin@riskedu.local').toLowerCase();
+    if (payload.email.toLowerCase() === allowedAdminEmail) {
+      throw new ForbiddenException('This email is reserved for admin access');
+    }
+
     const existingUser = await this.usersRepository.findOne({ where: { email: payload.email } });
     if (existingUser) {
       throw new ConflictException('User already exists');
@@ -29,19 +36,18 @@ export class AuthService {
     const user = this.usersRepository.create({
       email: payload.email,
       passwordHash,
-      role: payload.role ?? UserRole.ADVISOR,
+      // Public self-registration is strictly student-only.
+      role: UserRole.STUDENT,
       fullName: payload.fullName,
     });
 
-    if (user.role === UserRole.STUDENT) {
-      const studentProfile = this.studentProfilesRepository.create({
-        externalStudentId: payload.email,
-        fullName: payload.fullName ?? payload.email,
-        features: {},
-      });
-      const savedProfile = await this.studentProfilesRepository.save(studentProfile);
-      user.studentProfileId = savedProfile.id;
-    }
+    const studentProfile = this.studentProfilesRepository.create({
+      externalStudentId: payload.email,
+      fullName: payload.fullName ?? payload.email,
+      features: {},
+    });
+    const savedProfile = await this.studentProfilesRepository.save(studentProfile);
+    user.studentProfileId = savedProfile.id;
 
     const savedUser = await this.usersRepository.save(user);
     const accessToken = await this.createAccessToken(savedUser);
@@ -62,6 +68,13 @@ export class AuthService {
     const user = await this.usersRepository.findOne({ where: { email: payload.email } });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.role === UserRole.ADMIN) {
+      const allowedAdminEmail = this.configService.get<string>('ADMIN_EMAIL') ?? 'admin@riskedu.local';
+      if (user.email.toLowerCase() !== allowedAdminEmail.toLowerCase()) {
+        throw new UnauthorizedException('Admin access is restricted');
+      }
     }
 
     const isValid = await bcrypt.compare(payload.password, user.passwordHash);

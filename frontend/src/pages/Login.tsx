@@ -6,7 +6,6 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../hooks/useAuth';
-import { UserRole } from '../types';
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -16,14 +15,13 @@ export const Login = () => {
   const [email, setEmail] = useState('student@riskedu.local');
   const [password, setPassword] = useState('StrongPass123');
   const [fullName, setFullName] = useState('Student User');
-  const [role, setRole] = useState<UserRole>('student');
 
   const authMutation = useMutation({
     mutationFn: async () => {
       if (mode === 'login') {
         return login(email, password);
       }
-      return register(email, password, role, fullName);
+      return register(email, password, fullName);
     },
     onSuccess: (session) => {
       setSession(session);
@@ -50,14 +48,6 @@ export const Login = () => {
           {mode === 'register' && (
             <>
               <Input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Full name" />
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value as UserRole)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="student">Student</option>
-                <option value="admin">Admin</option>
-              </select>
             </>
           )}
 

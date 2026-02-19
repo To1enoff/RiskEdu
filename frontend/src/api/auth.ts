@@ -1,4 +1,4 @@
-import { AuthResponse, UserRole } from '../types';
+import { AuthResponse } from '../types';
 import { apiClient } from './client';
 
 export const login = async (email: string, password: string) => {
@@ -6,16 +6,10 @@ export const login = async (email: string, password: string) => {
   return data;
 };
 
-export const register = async (
-  email: string,
-  password: string,
-  role: UserRole,
-  fullName?: string,
-) => {
+export const register = async (email: string, password: string, fullName?: string) => {
   const { data } = await apiClient.post<AuthResponse>('/auth/register', {
     email,
     password,
-    role,
     fullName,
   });
   return data;
