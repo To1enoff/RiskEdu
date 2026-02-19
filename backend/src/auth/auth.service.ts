@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Logger,
   Injectable,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -18,7 +20,9 @@ import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
@@ -27,6 +31,22 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    // Backfill legacy accounts created before email verification was introduced.
+    const result = await this.usersRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({ emailVerified: true })
+      .where('"emailVerified" = :verified', { verified: false })
+      .andWhere('"emailVerificationCode" IS NULL')
+      .andWhere('"emailVerificationExpiresAt" IS NULL')
+      .execute();
+
+    if ((result.affected ?? 0) > 0) {
+      this.logger.log(`Marked ${result.affected} legacy account(s) as emailVerified=true`);
+    }
+  }
 
   async register(
     payload: RegisterDto,
