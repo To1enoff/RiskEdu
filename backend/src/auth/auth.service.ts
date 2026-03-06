@@ -186,7 +186,9 @@ export class AuthService implements OnModuleInit {
     user.passwordResetCode = generateVerificationCode();
     user.passwordResetExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await this.usersRepository.save(user);
-    await this.sendPasswordResetEmail(user.email, user.passwordResetCode);
+    // Do not block HTTP response on external SMTP latency.
+    // Render free instances + SMTP provider can be slow and cause frontend timeouts.
+    void this.sendPasswordResetEmail(user.email, user.passwordResetCode);
     return { message: 'If this email exists, a reset code was sent.' };
   }
 
@@ -254,6 +256,10 @@ export class AuthService implements OnModuleInit {
       port: smtpPort,
       secure: smtpPort === 465,
       auth: { user: smtpUser, pass: smtpPass },
+      // Keep auth endpoints responsive even when SMTP is slow/unreachable.
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     });
 
     try {
