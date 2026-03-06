@@ -239,11 +239,31 @@ export class AuthService implements OnModuleInit {
   }
 
   private async sendAuthCodeEmail(email: string, subject: string, text: string, fallbackLog: string) {
+    const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
+    const resendFrom = this.configService.get<string>('RESEND_FROM');
     const smtpHost = this.configService.get<string>('SMTP_HOST');
     const smtpPort = Number(this.configService.get<string>('SMTP_PORT') ?? 587);
     const smtpUser = this.configService.get<string>('SMTP_USER');
     const smtpPass = this.configService.get<string>('SMTP_PASS');
-    const smtpFrom = this.configService.get<string>('SMTP_FROM') ?? smtpUser ?? 'noreply@riskedu.local';
+    const smtpFrom =
+      this.configService.get<string>('SMTP_FROM') ??
+      resendFrom ??
+      smtpUser ??
+      'noreply@riskedu.local';
+
+    // Prefer email API on cloud because SMTP often times out on free instances.
+    if (resendApiKey && smtpFrom) {
+      const sentViaApi = await this.trySendViaResend({
+        apiKey: resendApiKey,
+        from: resendFrom ?? smtpFrom,
+        to: email,
+        subject,
+        text,
+      });
+      if (sentViaApi) {
+        return;
+      }
+    }
 
     if (!smtpHost || !smtpUser || !smtpPass) {
       console.log(fallbackLog);
@@ -275,6 +295,49 @@ export class AuthService implements OnModuleInit {
         `SMTP send failed for ${email}: ${error instanceof Error ? error.message : String(error)}`,
       );
       console.log(fallbackLog);
+    }
+  }
+
+  private async trySendViaResend(payload: {
+    apiKey: string;
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+  }): Promise<boolean> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${payload.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: payload.from,
+          to: [payload.to],
+          subject: payload.subject,
+          text: payload.text,
+        }),
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        return true;
+      }
+
+      const errorText = await response.text();
+      this.logger.warn(`Resend send failed for ${payload.to}: ${response.status} ${errorText}`);
+      return false;
+    } catch (error) {
+      this.logger.warn(
+        `Resend send failed for ${payload.to}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }
