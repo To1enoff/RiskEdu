@@ -345,7 +345,16 @@ export class CoursesService {
         }),
       );
       createdAt = prediction.createdAt;
-      suggestions = await this.aiSuggestions.generate(course.title, evaluated.reasons, computation.weightedPercent);
+      suggestions = await this.aiSuggestions.generate(course.title, evaluated.reasons, computation.weightedPercent, {
+        probabilityFail: evaluated.probabilityFail,
+        bucket: evaluated.bucket,
+        totalAbsences: computation.totalAbsences,
+        missingWeeksCount: computation.missingWeeksCount,
+        remainingWeight: computation.remainingWeight,
+        maxAchievablePercent: computation.maxAchievablePercent,
+        canStillPass: computation.maxAchievablePercent >= 50 && !evaluated.isAutoFail,
+        currentWeek: computeCurrentWeek(course.semesterStartDate ?? null),
+      });
       await this.suggestionsRepo.save(this.suggestionsRepo.create({ courseId, studentId, suggestionsJson: suggestions }));
     } else if (includeSuggestions) {
       const latest = await this.suggestionsRepo.findOne({ where: { courseId, studentId }, order: { createdAt: 'DESC' } });

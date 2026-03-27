@@ -10,35 +10,45 @@ export interface SuggestionItem {
   expectedImpact?: string;
 }
 
+export interface SuggestionsContext {
+  probabilityFail?: number;
+  bucket?: string;
+  totalAbsences?: number;
+  missingWeeksCount?: number;
+  remainingWeight?: number;
+  maxAchievablePercent?: number;
+  canStillPass?: boolean;
+  currentWeek?: number;
+}
+
 @Injectable()
 export class AiSuggestionsService {
   constructor(private readonly configService: ConfigService) {}
 
-  async generate(courseTitle: string, reasons: string[], weightedPercent: number): Promise<SuggestionItem[]> {
+  async generate(
+    courseTitle: string,
+    reasons: string[],
+    weightedPercent: number,
+    context?: SuggestionsContext,
+  ): Promise<SuggestionItem[]> {
     const apiKey = this.configService.get<string>('OPENAI_KEY');
     if (!apiKey) {
       return this.templateSuggestions(reasons, weightedPercent);
     }
 
     try {
-      const prompt = [
-        'Generate 3-6 concise student success suggestions in JSON array format.',
-        `Course: ${courseTitle}`,
-        `Weighted score: ${weightedPercent.toFixed(2)}%`,
-        `Reasons: ${reasons.join('; ')}`,
-        'Each item must include: title, why, actions (array), expectedImpact.',
-      ].join('\n');
+      const prompt = this.buildPrompt(courseTitle, reasons, weightedPercent, context);
 
       const { data } = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
           model: 'gpt-4o-mini',
-          temperature: 0.2,
+          temperature: 0.1,
           messages: [
             {
               role: 'system',
               content:
-                'You are an academic advisor assistant. Return only valid JSON. No markdown wrapper.',
+                'You are an academic advisor assistant. Return strictly valid JSON array only, no markdown.',
             },
             { role: 'user', content: prompt },
           ],
@@ -53,14 +63,80 @@ export class AiSuggestionsService {
       );
 
       const rawText = String(data?.choices?.[0]?.message?.content ?? '[]');
-      const parsed = JSON.parse(rawText) as SuggestionItem[];
-      if (!Array.isArray(parsed) || parsed.length === 0) {
+      const parsed = this.parseSuggestionsJson(rawText);
+      if (parsed.length === 0) {
         return this.templateSuggestions(reasons, weightedPercent);
       }
-      return parsed.slice(0, 6);
+      return parsed;
     } catch {
       return this.templateSuggestions(reasons, weightedPercent);
     }
+  }
+
+  private buildPrompt(
+    courseTitle: string,
+    reasons: string[],
+    weightedPercent: number,
+    context?: SuggestionsContext,
+  ): string {
+    const safeReasons = reasons.length ? reasons.join('; ') : 'No explicit reasons';
+    return [
+      'Generate 3-6 personalized student success suggestions as a JSON array.',
+      'Each item must include: title (short), why (specific), actions (2-4 concrete actions), expectedImpact.',
+      'Actions must be actionable this week and tied to provided metrics.',
+      '',
+      `Course: ${courseTitle}`,
+      `Weighted score: ${weightedPercent.toFixed(2)}%`,
+      `Risk probability: ${Math.round((context?.probabilityFail ?? 0) * 100)}%`,
+      `Risk bucket: ${context?.bucket ?? 'unknown'}`,
+      `Current week: ${context?.currentWeek ?? 0}`,
+      `Total absences: ${context?.totalAbsences ?? 0}`,
+      `Missing weeks count: ${context?.missingWeeksCount ?? 0}`,
+      `Remaining weight: ${context?.remainingWeight?.toFixed(2) ?? '0.00'}%`,
+      `Max achievable percent: ${context?.maxAchievablePercent?.toFixed(2) ?? '0.00'}%`,
+      `Can still pass: ${context?.canStillPass ? 'yes' : 'no'}`,
+      `Reasons: ${safeReasons}`,
+      '',
+      'Return JSON array only. No text before/after JSON.',
+    ].join('\n');
+  }
+
+  private parseSuggestionsJson(raw: string): SuggestionItem[] {
+    let text = raw.trim();
+    if (text.startsWith('```')) {
+      text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return [];
+    }
+
+    if (!Array.isArray(parsed)) return [];
+
+    const normalized: SuggestionItem[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      const title = typeof row.title === 'string' ? row.title.trim() : '';
+      const why = typeof row.why === 'string' ? row.why.trim() : '';
+      const actionsRaw = Array.isArray(row.actions) ? row.actions : [];
+      const actions = actionsRaw
+        .map((a) => (typeof a === 'string' ? a.trim() : ''))
+        .filter((a) => a.length > 0)
+        .slice(0, 4);
+      const expectedImpact =
+        typeof row.expectedImpact === 'string' && row.expectedImpact.trim().length > 0
+          ? row.expectedImpact.trim()
+          : undefined;
+
+      if (!title || !why || actions.length === 0) continue;
+      normalized.push({ title, why, actions, expectedImpact });
+    }
+
+    return normalized.slice(0, 6);
   }
 
   // Template fallback keeps the feature deterministic when LLM is unavailable.
