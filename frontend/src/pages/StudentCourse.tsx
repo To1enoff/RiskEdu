@@ -25,7 +25,7 @@ import { Slider } from '../components/ui/Slider';
 import { CourseWeightInput } from '../types';
 import { formatPercent } from '../utils/format';
 
-type TabKey = 'overview' | 'weeks' | 'exams' | 'risk' | 'whatif' | 'suggestions';
+type TabKey = 'overview' | 'weeks' | 'exams' | 'whatif' | 'suggestions';
 
 const defaultWeights: CourseWeightInput = {
   midterm: 30,
@@ -84,6 +84,14 @@ export const StudentCourse = () => {
   );
   const weightValid = Math.abs(totalWeight - 100) < 0.0001;
 
+  const recalculateAndRefreshRisk = async () => {
+    await predictCourseRisk(id);
+    await queryClient.invalidateQueries({ queryKey: ['course-risk', id] });
+    await queryClient.invalidateQueries({ queryKey: ['course-suggestions', id] });
+    await queryClient.invalidateQueries({ queryKey: ['student-course', id] });
+    await queryClient.invalidateQueries({ queryKey: ['student-courses'] });
+  };
+
   const saveSyllabusMutation = useMutation({
     mutationFn: () =>
       saveManualSyllabus(id, {
@@ -94,6 +102,7 @@ export const StudentCourse = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['course-weights', id] });
       await queryClient.invalidateQueries({ queryKey: ['student-course', id] });
+      await recalculateAndRefreshRisk();
     },
   });
 
@@ -122,6 +131,9 @@ export const StudentCourse = () => {
       setFile(null);
       await queryClient.invalidateQueries({ queryKey: ['course-weights', id] });
       await queryClient.invalidateQueries({ queryKey: ['student-course', id] });
+      if (data?.persisted) {
+        await recalculateAndRefreshRisk();
+      }
     },
     onError: () => {
       setUploadMessage('Failed to parse syllabus file.');
@@ -148,6 +160,7 @@ export const StudentCourse = () => {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['course-weeks', id] });
       await queryClient.invalidateQueries({ queryKey: ['student-course', id] });
+      await recalculateAndRefreshRisk();
     },
   });
 
@@ -162,15 +175,7 @@ export const StudentCourse = () => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['course-exams', id] });
-    },
-  });
-
-  const predictMutation = useMutation({
-    mutationFn: () => predictCourseRisk(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['course-risk', id] });
-      await queryClient.invalidateQueries({ queryKey: ['course-suggestions', id] });
-      await queryClient.invalidateQueries({ queryKey: ['student-course', id] });
+      await recalculateAndRefreshRisk();
     },
   });
 
@@ -198,6 +203,7 @@ export const StudentCourse = () => {
   const midterm = exams.find((e) => e.type === 'midterm')?.score;
   const final = exams.find((e) => e.type === 'final')?.score;
   const currentWeek = courseQuery.data.currentWeek ?? 0;
+  const lastRiskUpdate = riskQuery.dataUpdatedAt ? new Date(riskQuery.dataUpdatedAt).toLocaleString() : null;
 
   return (
     <div className="space-y-6">
@@ -213,9 +219,9 @@ export const StudentCourse = () => {
                 <p className="text-xs uppercase tracking-wide text-blue-100">Weighted</p>
                 <p className="text-lg font-semibold">{riskQuery.data?.weightedPercent?.toFixed(1) ?? '0.0'}%</p>
               </div>
-              <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
+              <div className="rounded-2xl border border-rose-200/60 bg-rose-100/25 px-4 py-2 shadow-md ring-1 ring-rose-200/30">
                 <p className="text-xs uppercase tracking-wide text-blue-100">Risk</p>
-                <p className="text-lg font-semibold">{formatPercent(riskQuery.data?.probabilityFail ?? 0)}</p>
+                <p className="text-xl font-extrabold text-rose-100">{formatPercent(riskQuery.data?.probabilityFail ?? 0)}</p>
               </div>
               <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
                 <p className="text-xs uppercase tracking-wide text-blue-100">Absences</p>
@@ -235,11 +241,14 @@ export const StudentCourse = () => {
               Back to dashboard
             </Link>
             {riskQuery.data && <Badge bucket={riskQuery.data.bucket} />}
+            <p className="text-xs font-medium text-blue-100/90">
+              Last recalculated: {lastRiskUpdate ?? 'not yet'}
+            </p>
           </div>
         </div>
       </Card>
       <div className="flex flex-wrap gap-2 rounded-3xl border border-slate-200/80 bg-white/85 p-2 shadow-soft backdrop-blur-md">
-  {(['overview', 'weeks', 'exams', 'risk', 'whatif', 'suggestions'] as TabKey[]).map((item) => (
+  {(['overview', 'weeks', 'exams', 'whatif', 'suggestions'] as TabKey[]).map((item) => (
     <button
       key={item}
       type="button"
@@ -376,34 +385,6 @@ export const StudentCourse = () => {
         </Card>
       )}
 
-      {tab === 'risk' && (
-        <Card variant="glass" className="p-6">
-          {riskQuery.isLoading && <Skeleton className="h-32" />}
-          {riskQuery.data && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-4xl font-bold text-slate-900">{riskQuery.data.weightedPercent.toFixed(1)}%</p>
-                <Badge bucket={riskQuery.data.bucket} />
-              </div>
-              <p className="text-sm text-slate-600">Risk probability: {formatPercent(riskQuery.data.probabilityFail)}</p>
-              <p className={`text-sm font-semibold ${riskQuery.data.canStillPass ? 'text-emerald-700' : 'text-red-700'}`}>
-                {riskQuery.data.canStillPass ? 'Can still pass' : 'Cannot reach passing threshold'}
-              </p>
-              {riskQuery.data.totalAbsences > 30 && <p className="text-sm font-semibold text-red-700">Absences exceed 30: auto-fail</p>}
-              {riskQuery.data.maxAchievablePercent < 50 && <p className="text-sm font-semibold text-red-700">Max achievable is below 50</p>}
-              <Button onClick={() => predictMutation.mutate()} disabled={predictMutation.isPending}>
-                {predictMutation.isPending ? 'Predicting...' : 'Recalculate Risk'}
-              </Button>
-              <ul className="list-disc space-y-1 pl-6 text-sm text-slate-700">
-                {riskQuery.data.reasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Card>
-      )}
-
       {tab === 'whatif' && (
         <Card variant="glass" className="p-6">
           <div className="grid gap-4 md:grid-cols-2">
@@ -442,7 +423,7 @@ export const StudentCourse = () => {
               </div>
             ))}
             {(suggestionsQuery.data?.suggestions ?? []).length === 0 && (
-              <p className="text-sm text-slate-500">Run course prediction first to generate suggestions.</p>
+              <p className="text-sm text-slate-500">Suggestions will appear automatically after syllabus/grades updates.</p>
             )}
           </div>
         </Card>

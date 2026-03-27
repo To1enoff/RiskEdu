@@ -64,11 +64,12 @@ export class CoursesService {
 
   async createStudentCourse(user: RequestUser, payload: CreateCourseDto) {
     this.assertStudent(user);
+    const inferredSemesterStartDate = formatDateOnlyUtc(inferSemesterStartDate(new Date()));
     const course = await this.coursesRepo.save(
       this.coursesRepo.create({
         studentId: user.sub,
         title: payload.title,
-        semesterStartDate: payload.semesterStartDate ?? null,
+        semesterStartDate: payload.semesterStartDate ?? inferredSemesterStartDate,
       }),
     );
     await this.seedWeeks(course.id);
@@ -488,6 +489,7 @@ export class CoursesService {
   private async getStudentCourseOrThrow(courseId: string, studentId: string) {
     const course = await this.getCourseByIdOrThrow(courseId);
     if (course.studentId !== studentId) throw new ForbiddenException('You do not have access to this course');
+    await this.ensureSemesterStartDate(course);
     return course;
   }
 
@@ -536,6 +538,12 @@ export class CoursesService {
 
   private async seedWeeks(courseId: string) {
     await this.weeksRepo.save(Array.from({ length: 15 }, (_, idx) => this.weeksRepo.create({ courseId, weekNumber: idx + 1 })));
+  }
+
+  private async ensureSemesterStartDate(course: Course): Promise<void> {
+    if (course.semesterStartDate) return;
+    course.semesterStartDate = formatDateOnlyUtc(inferSemesterStartDate(new Date()));
+    await this.coursesRepo.save(course);
   }
 
   // Keeps old/new courses safe even if syllabus hasn't been configured yet.
@@ -626,11 +634,11 @@ function toNumericOverrides(payload: Record<string, unknown> | undefined): Recor
 }
 
 function computeCurrentWeek(semesterStartDate: string | null): number {
-  if (!semesterStartDate) return 0;
-  const start = new Date(semesterStartDate);
+  const today = new Date();
+  const inferredStart = inferSemesterStartDate(today);
+  const start = semesterStartDate ? new Date(semesterStartDate) : inferredStart;
   if (Number.isNaN(start.getTime())) return 0;
 
-  const today = new Date();
   const startUtc = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
   const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   const diffDays = Math.floor((todayUtc - startUtc) / 86_400_000);
@@ -638,6 +646,39 @@ function computeCurrentWeek(semesterStartDate: string | null): number {
 
   const rawWeek = Math.floor(diffDays / 7) + 1;
   return Math.min(rawWeek, 15);
+}
+
+function inferSemesterStartDate(referenceDate: Date): Date {
+  const year = referenceDate.getUTCFullYear();
+  const month = referenceDate.getUTCMonth() + 1; // 1..12
+
+  if (month >= 1 && month <= 6) {
+    // Spring semester: first Monday strictly after Jan 15 (from Jan 16 onward).
+    return firstMondayOnOrAfterUtc(year, 0, 16);
+  }
+
+  if (month >= 9 && month <= 12) {
+    // Fall semester: first Monday of September.
+    return firstMondayOnOrAfterUtc(year, 8, 1);
+  }
+
+  // Summer break (Jul-Aug): anchor to upcoming fall semester start.
+  return firstMondayOnOrAfterUtc(year, 8, 1);
+}
+
+function firstMondayOnOrAfterUtc(year: number, monthZeroBased: number, day: number): Date {
+  const date = new Date(Date.UTC(year, monthZeroBased, day));
+  const dayOfWeek = date.getUTCDay(); // 0..6 (Sun..Sat)
+  const offsetToMonday = (8 - dayOfWeek) % 7;
+  date.setUTCDate(date.getUTCDate() + offsetToMonday);
+  return date;
+}
+
+function formatDateOnlyUtc(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 async function parseSyllabusFile(
