@@ -375,21 +375,50 @@ export class CoursesService {
     const allWeeks = await this.weeksRepo.find({ where: { courseId: course.id }, order: { weekNumber: 'ASC' } });
     const weekSubs = await this.weekSubmissionsRepo.find({ where: { studentId }, relations: { courseWeek: true } });
     const scopedWeekSubs = weekSubs.filter((s) => s.courseWeek?.courseId === course.id);
+    const currentWeek = clamp(computeCurrentWeek(course.semesterStartDate ?? null), 0, 15);
+    const elapsedWeeks = allWeeks.filter((w) => w.weekNumber <= currentWeek);
+    const elapsedWeekSubs = scopedWeekSubs.filter((s) => {
+      const weekNumber = s.courseWeek?.weekNumber;
+      return weekNumber !== undefined && weekNumber <= currentWeek;
+    });
+    const hasWeekData = (submission: WeekSubmission) =>
+      submission.quizScore !== null ||
+      submission.quizScore !== undefined ||
+      submission.assignmentScore !== null ||
+      submission.assignmentScore !== undefined ||
+      (submission.absenceCountWeek ?? 0) > 0;
+    const submittedElapsedWeekIds = new Set(
+      elapsedWeekSubs.filter(hasWeekData).map((submission) => submission.courseWeekId),
+    );
+
     const exams = await this.examSubmissionsRepo.find({ where: { courseId: course.id, studentId } });
     const midtermScore = clamp(overrides.midtermScore ?? exams.find((e) => e.type === ExamType.MIDTERM)?.score ?? 0, 0, 100);
     const finalScore = clamp(overrides.finalScore ?? exams.find((e) => e.type === ExamType.FINAL)?.score ?? 0, 0, 100);
-    const quizScores = scopedWeekSubs.map((s) => s.quizScore).filter((v): v is number => v !== null && v !== undefined);
-    const assignmentScores = scopedWeekSubs.map((s) => s.assignmentScore).filter((v): v is number => v !== null && v !== undefined);
+    const quizScores = elapsedWeekSubs.map((s) => s.quizScore).filter((v): v is number => v !== null && v !== undefined);
+    const assignmentScores = elapsedWeekSubs
+      .map((s) => s.assignmentScore)
+      .filter((v): v is number => v !== null && v !== undefined);
     const quizzesAverage = clamp(overrides.quizzesAverage ?? averageOrZero(quizScores), 0, 100);
     const assignmentsAverage = clamp(overrides.assignmentsAverage ?? averageOrZero(assignmentScores), 0, 100);
-    const totalAbsences = Math.max(0, Math.round(overrides.totalAbsences ?? scopedWeekSubs.reduce((sum, s) => sum + (s.absenceCountWeek ?? 0), 0)));
-    const missingWeeksCount = clamp(Math.round(overrides.missingWeeksCount ?? Math.max(0, allWeeks.length - scopedWeekSubs.length)), 0, 15);
+    const totalAbsences = Math.max(
+      0,
+      Math.round(overrides.totalAbsences ?? elapsedWeekSubs.reduce((sum, s) => sum + (s.absenceCountWeek ?? 0), 0)),
+    );
+    const missingWeeksCount = clamp(
+      Math.round(overrides.missingWeeksCount ?? Math.max(0, elapsedWeeks.length - submittedElapsedWeekIds.size)),
+      0,
+      15,
+    );
     const weightedPercent = calculateWeightedPercent({ weights, midtermScore, finalScore, quizzesAverage, assignmentsAverage, projectsScore: 0 });
+    const elapsedWeeksCount = elapsedWeeks.length;
     const completed = {
       [CourseComponent.MIDTERM]: overrides.midtermScore !== undefined || exams.some((e) => e.type === ExamType.MIDTERM),
       [CourseComponent.FINAL]: overrides.finalScore !== undefined || exams.some((e) => e.type === ExamType.FINAL),
-      [CourseComponent.QUIZZES]: overrides.quizzesAverage !== undefined || quizScores.length >= 15,
-      [CourseComponent.ASSIGNMENTS]: overrides.assignmentsAverage !== undefined || assignmentScores.length >= 15,
+      [CourseComponent.QUIZZES]:
+        overrides.quizzesAverage !== undefined || (elapsedWeeksCount > 0 && quizScores.length >= elapsedWeeksCount),
+      [CourseComponent.ASSIGNMENTS]:
+        overrides.assignmentsAverage !== undefined ||
+        (elapsedWeeksCount > 0 && assignmentScores.length >= elapsedWeeksCount),
       [CourseComponent.PROJECTS]: false,
     };
     const remainingWeight = Object.entries(weights).reduce((sum, [component, weight]) => sum + (completed[component as CourseComponent] ? 0 : weight), 0);
@@ -403,7 +432,7 @@ export class CoursesService {
       totalAbsences,
       missingWeeksCount,
       examCompletedRatio: [completed.midterm, completed.final].filter(Boolean).length / 2,
-      quizTrend: computeQuizTrend(scopedWeekSubs),
+      quizTrend: computeQuizTrend(elapsedWeekSubs),
       allComponentsCompleted,
     };
   }
