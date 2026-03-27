@@ -411,6 +411,10 @@ export const StudentCourse = () => {
       {tab === 'suggestions' && (
         <Card variant="glass" className="p-6">
           <div className="space-y-3">
+            <p className="text-xs font-medium text-slate-500">
+              Last suggestions update:{' '}
+              {suggestionsQuery.data?.createdAt ? new Date(suggestionsQuery.data.createdAt).toLocaleString() : 'not yet'}
+            </p>
             {(suggestionsQuery.data?.suggestions ?? []).map((suggestion) => (
               <div key={suggestion.title} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="font-semibold text-slate-900">{suggestion.title}</p>
@@ -420,6 +424,11 @@ export const StudentCourse = () => {
                     <li key={action}>{action}</li>
                   ))}
                 </ul>
+                {!!suggestion.dataSources?.length && (
+                  <p className="mt-2 text-xs font-medium text-slate-500">
+                    Based on: {suggestion.dataSources.join(', ')}
+                  </p>
+                )}
               </div>
             ))}
             {(suggestionsQuery.data?.suggestions ?? []).length === 0 && (

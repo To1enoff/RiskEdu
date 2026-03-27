@@ -127,6 +127,7 @@ export interface CourseRiskResponse {
     why: string;
     actions: string[];
     expectedImpact?: string;
+    dataSources?: string[];
   }>;
   createdAt: string;
 }
@@ -189,6 +190,7 @@ export interface AdminStudentDetailsResponse {
       why: string;
       actions: string[];
       expectedImpact?: string;
+      dataSources?: string[];
     }>;
     createdAt: string;
   }>;

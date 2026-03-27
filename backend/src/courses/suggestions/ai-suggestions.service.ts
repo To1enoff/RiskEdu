@@ -8,6 +8,7 @@ export interface SuggestionItem {
   why: string;
   actions: string[];
   expectedImpact?: string;
+  dataSources?: string[];
 }
 
 export interface SuggestionsContext {
@@ -82,7 +83,8 @@ export class AiSuggestionsService {
     const safeReasons = reasons.length ? reasons.join('; ') : 'No explicit reasons';
     return [
       'Generate 3-6 personalized student success suggestions as a JSON array.',
-      'Each item must include: title (short), why (specific), actions (2-4 concrete actions), expectedImpact.',
+      'Each item must include: title (short), why (specific), actions (2-4 concrete actions), expectedImpact, dataSources.',
+      'dataSources must be an array with 1-3 metrics names from this list when relevant: weightedPercent, probabilityFail, bucket, currentWeek, totalAbsences, missingWeeksCount, remainingWeight, maxAchievablePercent, canStillPass, reasons.',
       'Actions must be actionable this week and tied to provided metrics.',
       '',
       `Course: ${courseTitle}`,
@@ -131,9 +133,14 @@ export class AiSuggestionsService {
         typeof row.expectedImpact === 'string' && row.expectedImpact.trim().length > 0
           ? row.expectedImpact.trim()
           : undefined;
+      const dataSourcesRaw = Array.isArray(row.dataSources) ? row.dataSources : [];
+      const dataSources = dataSourcesRaw
+        .map((source) => (typeof source === 'string' ? source.trim() : ''))
+        .filter((source) => source.length > 0)
+        .slice(0, 3);
 
       if (!title || !why || actions.length === 0) continue;
-      normalized.push({ title, why, actions, expectedImpact });
+      normalized.push({ title, why, actions, expectedImpact, dataSources });
     }
 
     return normalized.slice(0, 6);
@@ -154,6 +161,7 @@ export class AiSuggestionsService {
           'Attend office hour for weak topics',
         ],
         expectedImpact: 'Can improve exam component confidence by 10-20 points.',
+        dataSources: ['weightedPercent', 'reasons'],
       });
     }
 
@@ -167,6 +175,7 @@ export class AiSuggestionsService {
           'Track quiz score trend week-by-week',
         ],
         expectedImpact: 'Improves continuous assessment trajectory and reduces volatility.',
+        dataSources: ['reasons', 'currentWeek'],
       });
     }
 
@@ -180,6 +189,7 @@ export class AiSuggestionsService {
           'Set target score milestones before submission',
         ],
         expectedImpact: 'Improves probability of staying above the 50% threshold.',
+        dataSources: ['remainingWeight', 'maxAchievablePercent', 'canStillPass'],
       });
     }
 
@@ -193,6 +203,7 @@ export class AiSuggestionsService {
           'Document missed material within 24 hours',
         ],
         expectedImpact: 'Reduces hard-rule failure risk from attendance breaches.',
+        dataSources: ['totalAbsences', 'reasons'],
       });
     }
 
@@ -206,6 +217,7 @@ export class AiSuggestionsService {
           'Submit at least one graded activity per week',
         ],
         expectedImpact: 'Improves completion ratio and risk stability.',
+        dataSources: ['currentWeek', 'missingWeeksCount', 'weightedPercent'],
       });
     }
 

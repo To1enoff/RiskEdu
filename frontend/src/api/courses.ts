@@ -157,6 +157,7 @@ export const getCourseSuggestions = async (courseId: string) => {
       why: string;
       actions: string[];
       expectedImpact?: string;
+      dataSources?: string[];
     }>;
     createdAt: string;
   };
