@@ -54,9 +54,9 @@ Default: `TRAIN_DATASET=none.csv`.
 1. Copy your dataset into `data/`.
 2. Copy env templates if needed:
    - root: `.env.example -> .env`
-   - backend: `backend/.env.example`
-   - frontend: `frontend/.env.example`
-   - ml: `ml-service/.env.example`
+   - backend: `backend/.env.example -> backend/.env`
+   - frontend: `frontend/.env.example -> frontend/.env`
+   - ml: `ml-service/.env.example -> ml-service/.env`
 3. Run:
 
 ```bash
@@ -218,7 +218,7 @@ docker compose run --rm backend npm test -- --runInBand
 ## Change Training Dataset / Oversampling
 
 1. Add file to `data/train_validate/csv/`.
-2. Set `TRAIN_DATASET=<file>.csv` in `ml-service/.env.example` (or env).
+2. Set `TRAIN_DATASET=<file>.csv` in `ml-service/.env`.
 3. Rebuild/restart ML service:
 
 ```bash

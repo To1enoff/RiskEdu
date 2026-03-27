@@ -84,6 +84,10 @@ export class AuthService implements OnModuleInit {
     user.studentProfileId = savedProfile.id;
 
     const savedUser = await this.usersRepository.save(user);
+    if (!this.isProduction()) {
+      this.logger.log(`[auth] Verification code for ${savedUser.email}: ${savedUser.emailVerificationCode}`);
+    }
+
     await this.sendVerificationEmail(savedUser.email, savedUser.emailVerificationCode ?? '');
 
     return {
@@ -282,6 +286,14 @@ export class AuthService implements OnModuleInit {
       socketTimeout: 10000,
     });
 
+<<<<<<< HEAD
+    await transporter.sendMail({
+      from: smtpFrom,
+      to: email,
+      subject: 'RiskEdu email verification code',
+      text: `Your verification code is: ${code}. It expires in 10 minutes.`,
+    });
+=======
     try {
       await transporter.sendMail({
         from: smtpFrom,
@@ -339,6 +351,7 @@ export class AuthService implements OnModuleInit {
     } finally {
       clearTimeout(timeout);
     }
+>>>>>>> 5103559e0b8496a7e19ed253fb50b3fd31b5a809
   }
 }
 

@@ -21,6 +21,7 @@ export const CourseSyllabus = () => {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
+  const [semesterStartDate, setSemesterStartDate] = useState('');
   const [weights, setWeights] = useState<CourseWeightInput>(defaultWeights);
   const [file, setFile] = useState<File | null>(null);
   const [uploadMessage, setUploadMessage] = useState('');
@@ -36,6 +37,7 @@ export const CourseSyllabus = () => {
       return;
     }
     setTitle(weightsQuery.data.title);
+    setSemesterStartDate(weightsQuery.data.semesterStartDate ?? '');
     const mapped = { ...defaultWeights };
     for (const item of weightsQuery.data.weights) {
       if (item.componentName in mapped) {
@@ -57,7 +59,12 @@ export const CourseSyllabus = () => {
   const isValid = Math.abs(totalWeight - 100) < 0.0001;
 
   const saveMutation = useMutation({
-    mutationFn: () => saveManualSyllabus(id, { title, weights }),
+    mutationFn: () =>
+      saveManualSyllabus(id, {
+        title,
+        semesterStartDate: semesterStartDate || undefined,
+        weights,
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['course-weights', id] });
     },
@@ -71,6 +78,9 @@ export const CourseSyllabus = () => {
     onSuccess: async (data) => {
       if (data?.title) {
         setTitle(data.title);
+      }
+      if (data?.semesterStartDate !== undefined) {
+        setSemesterStartDate(data.semesterStartDate ?? '');
       }
       if (data?.weights) {
         setWeights({
@@ -119,6 +129,14 @@ export const CourseSyllabus = () => {
         <div>
           <p className="text-sm text-slate-500">Course title</p>
           <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+        </div>
+
+        <div>
+          <p className="text-sm text-slate-500">Semester start date</p>
+          <Input type="date" value={semesterStartDate} onChange={(event) => setSemesterStartDate(event.target.value)} />
+          <p className="mt-1 text-xs text-slate-500">
+            Current week is determined automatically from this date.
+          </p>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">

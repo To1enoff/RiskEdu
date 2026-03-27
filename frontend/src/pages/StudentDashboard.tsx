@@ -123,6 +123,7 @@ export const StudentDashboard = () => {
               <p>Weighted: {Number(course.weightedPercent ?? 0).toFixed(1)}%</p>
               <p>Risk: {formatPercent(course.probabilityFail)}</p>
               <p>Absences: {course.totalAbsences ?? 0} ({course.absenceStatus ?? 'normal'})</p>
+              <p>Current week: {course.currentWeek > 0 ? course.currentWeek : 'not started'}</p>
             </div>
             <div className="mt-4 flex items-center justify-between gap-2">
               <p className="text-xs text-slate-500">Open Overview to edit syllabus, weeks, exams and delete this course.</p>

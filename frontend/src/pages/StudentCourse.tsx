@@ -41,6 +41,7 @@ export const StudentCourse = () => {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabKey>('overview');
   const [title, setTitle] = useState('');
+  const [semesterStartDate, setSemesterStartDate] = useState('');
   const [weights, setWeights] = useState<CourseWeightInput>(defaultWeights);
   const [file, setFile] = useState<File | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string>('');
@@ -62,6 +63,7 @@ export const StudentCourse = () => {
   useEffect(() => {
     if (!weightsQuery.data) return;
     setTitle(weightsQuery.data.title);
+    setSemesterStartDate(weightsQuery.data.semesterStartDate ?? '');
     const mapped = { ...defaultWeights };
     for (const row of weightsQuery.data.weights) {
       if (row.componentName in mapped) {
@@ -83,9 +85,15 @@ export const StudentCourse = () => {
   const weightValid = Math.abs(totalWeight - 100) < 0.0001;
 
   const saveSyllabusMutation = useMutation({
-    mutationFn: () => saveManualSyllabus(id, { title, weights }),
+    mutationFn: () =>
+      saveManualSyllabus(id, {
+        title,
+        semesterStartDate: semesterStartDate || undefined,
+        weights,
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['course-weights', id] });
+      await queryClient.invalidateQueries({ queryKey: ['student-course', id] });
     },
   });
 
@@ -97,6 +105,9 @@ export const StudentCourse = () => {
     onSuccess: async (data) => {
       if (data?.title) {
         setTitle(data.title);
+      }
+      if (data?.semesterStartDate !== undefined) {
+        setSemesterStartDate(data.semesterStartDate ?? '');
       }
       if (data?.weights) {
         setWeights({
@@ -110,6 +121,7 @@ export const StudentCourse = () => {
       setUploadMessage(data?.message ?? 'Syllabus parsed.');
       setFile(null);
       await queryClient.invalidateQueries({ queryKey: ['course-weights', id] });
+      await queryClient.invalidateQueries({ queryKey: ['student-course', id] });
     },
     onError: () => {
       setUploadMessage('Failed to parse syllabus file.');
@@ -185,6 +197,7 @@ export const StudentCourse = () => {
   const exams = examsQuery.data?.exams ?? [];
   const midterm = exams.find((e) => e.type === 'midterm')?.score;
   const final = exams.find((e) => e.type === 'final')?.score;
+  const currentWeek = courseQuery.data.currentWeek ?? 0;
 
   return (
     <div className="space-y-6">
@@ -207,6 +220,10 @@ export const StudentCourse = () => {
               <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
                 <p className="text-xs uppercase tracking-wide text-blue-100">Absences</p>
                 <p className="text-lg font-semibold">{riskQuery.data?.totalAbsences ?? 0}</p>
+              </div>
+              <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2">
+                <p className="text-xs uppercase tracking-wide text-blue-100">Current Week</p>
+                <p className="text-lg font-semibold">{courseQuery.data.currentWeek > 0 ? courseQuery.data.currentWeek : '-'}</p>
               </div>
             </div>
           </div>
@@ -244,6 +261,11 @@ export const StudentCourse = () => {
             <div className="flex-1">
             <p className="text-sm font-semibold text-slate-700">Course title</p>
             <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+            <p className="mt-3 text-sm font-semibold text-slate-700">Semester start date</p>
+            <Input type="date" value={semesterStartDate} onChange={(event) => setSemesterStartDate(event.target.value)} />
+            <p className="mt-2 text-xs text-slate-500">
+              Current week is calculated automatically from this date.
+            </p>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <WeightInput label="Midterm %" value={weights.midterm} onChange={onWeight('midterm', setWeights)} />
               <WeightInput label="Final %" value={weights.final} onChange={onWeight('final', setWeights)} />
@@ -285,10 +307,29 @@ export const StudentCourse = () => {
 
       {tab === 'weeks' && (
         <Card variant="glass" className="p-5 md:p-6">
+          {currentWeek > 0 && (
+            <p className="mb-3 text-sm font-medium text-slate-600">
+              Current week: <span className="font-semibold text-blue-700">Week {currentWeek}</span>
+            </p>
+          )}
           <div className="grid gap-3 md:grid-cols-2">
             {weeks.map((week) => (
-              <div key={week.weekNumber} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                <h3 className="font-semibold text-slate-900">Week {week.weekNumber}</h3>
+              <div
+                key={week.weekNumber}
+                className={`rounded-2xl border p-4 ${
+                  currentWeek > 0 && week.weekNumber === currentWeek
+                    ? 'border-blue-300 bg-blue-50/80 ring-1 ring-blue-200'
+                    : 'border-slate-200 bg-slate-50/60'
+                }`}
+              >
+                <h3 className="font-semibold text-slate-900">
+                  Week {week.weekNumber}{' '}
+                  {currentWeek > 0 && week.weekNumber === currentWeek && (
+                    <span className="ml-1 rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
+                      Current
+                    </span>
+                  )}
+                </h3>
                 <div className="mt-2 grid gap-2">
                   <Input id={`quiz-${week.weekNumber}`} type="number" defaultValue={week.quizScore ?? ''} placeholder="Quiz score" />
                   <Input id={`assign-${week.weekNumber}`} type="number" defaultValue={week.assignmentScore ?? ''} placeholder="Assignment score" />

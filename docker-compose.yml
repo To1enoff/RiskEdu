@@ -24,7 +24,7 @@ services:
     container_name: riskedu-ml
     restart: unless-stopped
     env_file:
-      - ./ml-service/.env.example
+      - ./ml-service/.env
     environment:
       DATA_ROOT: /app/data
       ARTIFACT_DIR: /app/artifacts
@@ -46,7 +46,7 @@ services:
     container_name: riskedu-backend
     restart: unless-stopped
     env_file:
-      - ./backend/.env.example
+      - ./backend/.env
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-riskedu}:${POSTGRES_PASSWORD:-riskedu}@postgres:5432/${POSTGRES_DB:-riskedu}
@@ -75,7 +75,7 @@ services:
     container_name: riskedu-frontend
     restart: unless-stopped
     env_file:
-      - ./frontend/.env.example
+      - ./frontend/.env
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     depends_on:

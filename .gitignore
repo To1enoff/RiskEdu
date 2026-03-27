@@ -1,8 +1,14 @@
 node_modules/
 dist/
+coverage/
+
+# Local environment files (keep *.env.example in repo)
 .env
-.env.*
-!.env.example
+backend/.env
+frontend/.env
+ml-service/.env
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -11,9 +17,11 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
+
+# ML artifacts/data
 artifacts/
 *.log
+
+# OS/editor
 .DS_Store
 Thumbs.db
-coverage/
-*.sqlite

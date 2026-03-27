@@ -24,6 +24,9 @@ export class Course {
   @Column()
   title!: string;
 
+  @Column({ type: 'date', nullable: true })
+  semesterStartDate?: string | null;
+
   @OneToMany(() => CourseWeight, (weight) => weight.course, { cascade: true })
   weights?: CourseWeight[];
 

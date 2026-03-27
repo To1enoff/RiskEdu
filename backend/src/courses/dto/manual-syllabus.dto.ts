@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNumber, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsDateString, IsNumber, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class CourseWeightsDto {
   @ApiPropertyOptional({ example: 30 })
@@ -39,6 +39,11 @@ export class ManualSyllabusDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  @ApiPropertyOptional({ example: '2026-09-01' })
+  @IsOptional()
+  @IsDateString()
+  semesterStartDate?: string;
 
   @ApiProperty({ type: CourseWeightsDto })
   @IsObject()

@@ -64,7 +64,13 @@ export class CoursesService {
 
   async createStudentCourse(user: RequestUser, payload: CreateCourseDto) {
     this.assertStudent(user);
-    const course = await this.coursesRepo.save(this.coursesRepo.create({ studentId: user.sub, title: payload.title }));
+    const course = await this.coursesRepo.save(
+      this.coursesRepo.create({
+        studentId: user.sub,
+        title: payload.title,
+        semesterStartDate: payload.semesterStartDate ?? null,
+      }),
+    );
     await this.seedWeeks(course.id);
     await this.ensureDefaultWeights(course.id);
     return this.getCourseCard(course.id, user.sub);
@@ -87,15 +93,25 @@ export class CoursesService {
     const normalizedWeights = normalizeAndValidateWeights(payload.weights as Record<string, number | undefined>);
     if (payload.title) {
       course.title = payload.title;
-      await this.coursesRepo.save(course);
     }
+    if (payload.semesterStartDate !== undefined) {
+      course.semesterStartDate = payload.semesterStartDate || null;
+    }
+    await this.coursesRepo.save(course);
     await this.weightsRepo.delete({ courseId });
     await this.weightsRepo.save(
       Object.entries(normalizedWeights).map(([componentName, weightPercent]) =>
         this.weightsRepo.create({ courseId, componentName: componentName as CourseComponent, weightPercent }),
       ),
     );
-    return { courseId, studentId: user.sub, title: course.title, weights: normalizedWeights };
+    return {
+      courseId,
+      studentId: user.sub,
+      title: course.title,
+      semesterStartDate: course.semesterStartDate ?? null,
+      currentWeek: computeCurrentWeek(course.semesterStartDate ?? null),
+      weights: normalizedWeights,
+    };
   }
 
   async getWeights(user: RequestUser, courseId: string) {
@@ -106,6 +122,8 @@ export class CoursesService {
       courseId,
       studentId: user.sub,
       title: course.title,
+      semesterStartDate: course.semesterStartDate ?? null,
+      currentWeek: computeCurrentWeek(course.semesterStartDate ?? null),
       totalWeight: rows.reduce((s, r) => s + r.weightPercent, 0),
       weights: rows.map((r) => ({ componentName: r.componentName, weightPercent: r.weightPercent })),
     };
@@ -126,6 +144,8 @@ export class CoursesService {
         courseId,
         studentId: user.sub,
         title,
+        semesterStartDate: course.semesterStartDate ?? null,
+        currentWeek: computeCurrentWeek(course.semesterStartDate ?? null),
         weights: parsed.weights,
         totalWeight,
         persisted: false,
@@ -425,6 +445,8 @@ export class CoursesService {
       id: course.id,
       studentId: course.studentId,
       title: course.title,
+      semesterStartDate: course.semesterStartDate ?? null,
+      currentWeek: computeCurrentWeek(course.semesterStartDate ?? null),
       createdAt: course.createdAt,
       weightedPercent: risk.weightedPercent,
       probabilityFail: risk.probabilityFail,
@@ -572,6 +594,21 @@ function toNumericOverrides(payload: Record<string, unknown> | undefined): Recor
     }
   }
   return result;
+}
+
+function computeCurrentWeek(semesterStartDate: string | null): number {
+  if (!semesterStartDate) return 0;
+  const start = new Date(semesterStartDate);
+  if (Number.isNaN(start.getTime())) return 0;
+
+  const today = new Date();
+  const startUtc = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const diffDays = Math.floor((todayUtc - startUtc) / 86_400_000);
+  if (diffDays < 0) return 0;
+
+  const rawWeek = Math.floor(diffDays / 7) + 1;
+  return Math.min(rawWeek, 15);
 }
 
 async function parseSyllabusFile(

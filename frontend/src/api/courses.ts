@@ -20,8 +20,12 @@ export const deleteStudentCourse = async (courseId: string) => {
 };
 
 
-export const createStudentCourse = async (title: string) => {
-  const { data } = await apiClient.post<Course>('/student/courses', { title });
+export const createStudentCourse = async (title: string, semesterStartDate?: string) => {
+  const payload: { title: string; semesterStartDate?: string } = { title };
+  if (semesterStartDate) {
+    payload.semesterStartDate = semesterStartDate;
+  }
+  const { data } = await apiClient.post<Course>('/student/courses', payload);
   return data;
 };
 
@@ -34,7 +38,10 @@ export const getStudentCourseById = async (courseId: string) => {
   return data;
 };
 
-export const saveManualSyllabus = async (courseId: string, payload: { title?: string; weights: CourseWeightInput }) => {
+export const saveManualSyllabus = async (
+  courseId: string,
+  payload: { title?: string; semesterStartDate?: string; weights: CourseWeightInput },
+) => {
   const { data } = await apiClient.post(`/student/courses/${courseId}/syllabus/manual`, payload);
   return data;
 };
@@ -47,6 +54,8 @@ export const uploadSyllabusFile = async (courseId: string, file: File) => {
     courseId: string;
     studentId: string;
     title: string;
+    semesterStartDate: string | null;
+    currentWeek: number;
     weights: {
       midterm: number;
       final: number;
@@ -67,6 +76,8 @@ export const getCourseWeights = async (courseId: string) => {
     courseId: string;
     studentId: string;
     title: string;
+    semesterStartDate: string | null;
+    currentWeek: number;
     totalWeight: number;
     weights: Array<{ componentName: string; weightPercent: number }>;
   };

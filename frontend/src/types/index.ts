@@ -89,6 +89,8 @@ export interface Course {
   title: string;
   studentId: string;
   createdAt: string;
+  semesterStartDate: string | null;
+  currentWeek: number;
   weightedPercent: number;
   probabilityFail: number;
   bucket: RiskBucket;
