@@ -11,6 +11,14 @@ export interface SuggestionItem {
   dataSources?: string[];
 }
 
+export type AiSuggestionStatus = 'ai' | 'fallback_no_key' | 'fallback_error' | 'fallback_invalid_json';
+
+export interface SuggestionGenerationResult {
+  suggestions: SuggestionItem[];
+  status: AiSuggestionStatus;
+  message: string;
+}
+
 export interface SuggestionsContext {
   probabilityFail?: number;
   bucket?: string;
@@ -31,10 +39,14 @@ export class AiSuggestionsService {
     reasons: string[],
     weightedPercent: number,
     context?: SuggestionsContext,
-  ): Promise<SuggestionItem[]> {
+  ): Promise<SuggestionGenerationResult> {
     const apiKey = this.configService.get<string>('OPENAI_KEY');
     if (!apiKey) {
-      return this.templateSuggestions(reasons, weightedPercent);
+      return {
+        suggestions: this.templateSuggestions(reasons, weightedPercent),
+        status: 'fallback_no_key',
+        message: 'OPENAI_KEY is missing. Using fallback suggestions.',
+      };
     }
 
     try {
@@ -66,11 +78,23 @@ export class AiSuggestionsService {
       const rawText = String(data?.choices?.[0]?.message?.content ?? '[]');
       const parsed = this.parseSuggestionsJson(rawText);
       if (parsed.length === 0) {
-        return this.templateSuggestions(reasons, weightedPercent);
+        return {
+          suggestions: this.templateSuggestions(reasons, weightedPercent),
+          status: 'fallback_invalid_json',
+          message: 'AI response was invalid. Using fallback suggestions.',
+        };
       }
-      return parsed;
+      return {
+        suggestions: parsed,
+        status: 'ai',
+        message: 'AI suggestions generated successfully.',
+      };
     } catch {
-      return this.templateSuggestions(reasons, weightedPercent);
+      return {
+        suggestions: this.templateSuggestions(reasons, weightedPercent),
+        status: 'fallback_error',
+        message: 'AI request failed. Using fallback suggestions.',
+      };
     }
   }
 

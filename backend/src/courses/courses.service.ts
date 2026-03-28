@@ -25,7 +25,7 @@ import { WhatIfSimulation } from './entities/what-if-simulation.entity';
 import { RiskEngineService } from './risk-engine/risk-engine.service';
 import { calculateMaxAchievablePercent, calculateWeightedPercent } from './risk-engine/grading.utils';
 import { CourseRiskResult } from './risk-engine/risk-engine.types';
-import { AiSuggestionsService, SuggestionItem } from './suggestions/ai-suggestions.service';
+import { AiSuggestionStatus, AiSuggestionsService, SuggestionItem } from './suggestions/ai-suggestions.service';
 
 export interface RequestUser {
   sub: string;
@@ -332,6 +332,8 @@ export class CoursesService {
     const evaluated = await this.evaluate(computation);
     let suggestions: SuggestionItem[] = [];
     let createdAt = new Date();
+    let aiSuggestionStatus: AiSuggestionStatus | undefined;
+    let aiSuggestionMessage: string | undefined;
     if (persistPrediction) {
       const prediction = await this.riskRepo.save(
         this.riskRepo.create({
@@ -345,7 +347,7 @@ export class CoursesService {
         }),
       );
       createdAt = prediction.createdAt;
-      suggestions = await this.aiSuggestions.generate(course.title, evaluated.reasons, computation.weightedPercent, {
+      const suggestionResult = await this.aiSuggestions.generate(course.title, evaluated.reasons, computation.weightedPercent, {
         probabilityFail: evaluated.probabilityFail,
         bucket: evaluated.bucket,
         totalAbsences: computation.totalAbsences,
@@ -355,6 +357,9 @@ export class CoursesService {
         canStillPass: computation.maxAchievablePercent >= 50 && !evaluated.isAutoFail,
         currentWeek: computeCurrentWeek(course.semesterStartDate ?? null),
       });
+      suggestions = suggestionResult.suggestions;
+      aiSuggestionStatus = suggestionResult.status;
+      aiSuggestionMessage = suggestionResult.message;
       await this.suggestionsRepo.save(this.suggestionsRepo.create({ courseId, studentId, suggestionsJson: suggestions }));
     } else if (includeSuggestions) {
       const latest = await this.suggestionsRepo.findOne({ where: { courseId, studentId }, order: { createdAt: 'DESC' } });
@@ -377,6 +382,8 @@ export class CoursesService {
       reasons: evaluated.reasons,
       suggestions,
       createdAt,
+      aiSuggestionStatus,
+      aiSuggestionMessage,
     };
   }
 
