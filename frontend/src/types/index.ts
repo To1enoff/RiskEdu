@@ -129,6 +129,8 @@ export interface CourseRiskResponse {
     expectedImpact?: string;
     dataSources?: string[];
   }>;
+  aiSuggestionStatus?: 'ai' | 'fallback_no_key' | 'fallback_error' | 'fallback_invalid_json';
+  aiSuggestionMessage?: string;
   createdAt: string;
 }
 
