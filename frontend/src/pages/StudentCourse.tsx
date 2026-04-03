@@ -84,30 +84,11 @@ export const StudentCourse = () => {
   );
   const weightValid = Math.abs(totalWeight - 100) < 0.0001;
 
-  const showAiStatusAlert = (status?: 'ai' | 'fallback_no_key' | 'fallback_error' | 'fallback_invalid_json', message?: string) => {
-    if (!status) return;
-    if (status === 'ai') {
-      window.alert(message || 'Gemini API key working: AI suggestions generated successfully.');
-      return;
-    }
-
-    const fallbackText =
-      message ??
-      (status === 'fallback_no_key'
-        ? 'GEMINI_API_KEY is missing. Using fallback suggestions.'
-        : status === 'fallback_invalid_json'
-        ? 'Gemini response was invalid. Using fallback suggestions.'
-        : 'AI request failed. Using fallback suggestions.');
-
-    window.alert(`Gemini API key status: ${fallbackText}`);
-  };
-
   const recalculateAndRefreshRisk = async () => {
     try {
-      const prediction = await predictCourseRisk(id);
-      showAiStatusAlert(prediction.aiSuggestionStatus, prediction.aiSuggestionMessage);
+      await predictCourseRisk(id);
     } catch (error) {
-      window.alert('Unable to refresh course risk or check Gemini API status.');
+      console.error('Unable to refresh course risk after update', error);
     }
 
     await queryClient.invalidateQueries({ queryKey: ['course-risk', id] });
