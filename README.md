@@ -112,7 +112,9 @@ Required env:
 - `JWT_SECRET=<strong random secret>`
 - `JWT_EXPIRES_IN=1d`
 - `CORS_ORIGIN=https://to1enoff.github.io`
-- `OPENAI_KEY=` (optional)
+- `GEMINI_API_KEY=` (optional, for AI suggestions + syllabus AI fallback)
+- `GEMINI_MODEL=gemini-2.0-flash` (optional)
+- `GEMINI_SYLLABUS_MODEL=gemini-2.0-flash` (optional)
 
 Verify:
 - `https://riskedu-backend.onrender.com/health`
@@ -136,6 +138,9 @@ Open:
 - Auth:
   - `POST /auth/register`
   - `POST /auth/login`
+  - `POST /auth/verify-email`
+  - `POST /auth/forgot-password`
+  - `POST /auth/reset-password`
 - Roles: `admin`, `advisor`, `instructor`, `student`
 - RBAC examples:
   - `GET /analytics/feature-importance` -> `admin`
@@ -180,6 +185,10 @@ Production note:
 
 - Course duration: exactly `15` weeks.
 - Weights must sum to `100`.
+- Current week is auto-calculated from semester start date:
+  - Jan-Jun semester: first Monday on/after Jan 16
+  - Sep-Dec semester: first Monday of September
+- If syllabus/grades/exams/weeks change, risk + suggestions are recalculated automatically.
 - Fail conditions:
   - weighted total `< 50`
   - `totalAbsences > 30` -> auto fail (`probabilityFail=1`, `bucket=red`)
@@ -208,6 +217,11 @@ Backend unit tests include:
 - auto fail (impossible recovery)
 - risk bucket mapping
 - suggestions generation
+
+AI behavior:
+- If `GEMINI_API_KEY` is set and model call succeeds, suggestions come from Gemini.
+- If key/model call fails, backend returns deterministic fallback suggestions.
+- Backend also returns AI status/message to frontend so the UI can show key/model health.
 
 Run backend tests:
 
