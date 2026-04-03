@@ -9,6 +9,44 @@ import { Input } from '../components/ui/Input';
 import { useAuth } from '../hooks/useAuth';
 import { AuthResponse } from '../types';
 
+const extractApiErrorMessage = (error: unknown): string => {
+  if (!axios.isAxiosError(error)) {
+    return 'Something went wrong. Please try again.';
+  }
+
+  if (error.code === 'ECONNABORTED' || String(error.message).toLowerCase().includes('timeout')) {
+    return 'Request timed out. Backend may be waking up on Render. Try again in 20-40 seconds.';
+  }
+
+  const payload = error.response?.data as unknown;
+
+  if (typeof payload === 'string' && payload.trim()) {
+    return payload;
+  }
+
+  if (payload && typeof payload === 'object') {
+    const data = payload as { message?: unknown; error?: unknown };
+    if (Array.isArray(data.message) && data.message.length > 0) {
+      return String(data.message[0]);
+    }
+    if (typeof data.message === 'string' && data.message.trim()) {
+      return data.message;
+    }
+    if (typeof data.error === 'string' && data.error.trim()) {
+      return data.error;
+    }
+  }
+
+  if (error.response?.status === 409) {
+    return 'Account with this email already exists.';
+  }
+  if (error.response?.status === 401) {
+    return 'Invalid email or password.';
+  }
+
+  return 'Authentication failed.';
+};
+
 export const Login = () => {
   const navigate = useNavigate();
   const { setSession } = useAuth();
@@ -56,7 +94,13 @@ export const Login = () => {
         setInfoMessage('Password reset successful. Please log in.');
         return;
       }
+
       const session = result as AuthResponse;
+      if (!session?.accessToken || !session?.user?.role) {
+        setErrorMessage('Unexpected server response. Please try again.');
+        return;
+      }
+
       setSession(session);
       if (session.user.role === 'student') {
         navigate('/student/dashboard');
@@ -65,25 +109,14 @@ export const Login = () => {
       navigate('/admin/dashboard');
     },
     onError: (error) => {
-      if (!axios.isAxiosError(error)) {
-        setErrorMessage('Authentication failed.');
-        return;
-      }
-      if (error.code === 'ECONNABORTED' || String(error.message).toLowerCase().includes('timeout')) {
-        setErrorMessage('Request timed out. Backend may be waking up on Render. Try again in 20-40 seconds.');
-        return;
-      }
-      const payload = error.response?.data as { message?: string | string[] } | undefined;
-      if (payload?.message) {
-        setErrorMessage(Array.isArray(payload.message) ? payload.message[0] : payload.message);
-        return;
-      }
-      setErrorMessage('Authentication failed.');
+      setErrorMessage(extractApiErrorMessage(error));
     },
   });
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    authMutation.reset();
+    setErrorMessage('');
     authMutation.mutate();
   };
 
@@ -176,6 +209,7 @@ export const Login = () => {
             onClick={() => {
               setInfoMessage('');
               setErrorMessage('');
+              authMutation.reset();
               setMode((prev) => (prev === 'login' ? 'register' : 'login'));
             }}
             className="mt-4 text-sm font-semibold text-blue-600"
@@ -189,6 +223,7 @@ export const Login = () => {
             onClick={() => {
               setInfoMessage('');
               setErrorMessage('');
+              authMutation.reset();
               setMode('forgot');
             }}
             className="mt-2 text-sm font-semibold text-blue-600"
@@ -202,6 +237,7 @@ export const Login = () => {
             onClick={() => {
               setInfoMessage('');
               setErrorMessage('');
+              authMutation.reset();
               setMode('login');
             }}
             className="mt-4 text-sm font-semibold text-blue-600"
