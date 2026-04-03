@@ -247,6 +247,8 @@ export class AuthService implements OnModuleInit {
   }
 
   private async sendAuthCodeEmail(email: string, subject: string, text: string, fallbackLog: string) {
+    const sendGridApiKey = this.configService.get<string>('SENDGRID_API_KEY');
+    const sendGridFrom = this.configService.get<string>('SENDGRID_FROM');
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     const resendFrom = this.configService.get<string>('RESEND_FROM');
     const smtpHost = this.configService.get<string>('SMTP_HOST');
@@ -255,11 +257,26 @@ export class AuthService implements OnModuleInit {
     const smtpPass = this.configService.get<string>('SMTP_PASS');
     const smtpFrom =
       this.configService.get<string>('SMTP_FROM') ??
+      sendGridFrom ??
       resendFrom ??
       smtpUser ??
       'noreply@riskedu.local';
 
-    // Prefer email API on cloud because SMTP often times out on free instances.
+    // Prefer SendGrid Email API on cloud because SMTP often times out on free instances.
+    if (sendGridApiKey && smtpFrom) {
+      const sentViaSendGrid = await this.trySendViaSendGridApi({
+        apiKey: sendGridApiKey,
+        from: sendGridFrom ?? smtpFrom,
+        to: email,
+        subject,
+        text,
+      });
+      if (sentViaSendGrid) {
+        return;
+      }
+    }
+
+    // Secondary API provider fallback.
     if (resendApiKey && smtpFrom) {
       const sentViaApi = await this.trySendViaResend({
         apiKey: resendApiKey,
@@ -306,6 +323,49 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  private async trySendViaSendGridApi(payload: {
+    apiKey: string;
+    from: string;
+    to: string;
+    subject: string;
+    text: string;
+  }): Promise<boolean> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${payload.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: payload.to }] }],
+          from: { email: this.extractEmail(payload.from), name: this.extractName(payload.from) },
+          subject: payload.subject,
+          content: [{ type: 'text/plain', value: payload.text }],
+        }),
+        signal: controller.signal,
+      });
+
+      if (response.ok || response.status === 202) {
+        return true;
+      }
+
+      const errorText = await response.text();
+      this.logger.warn(`SendGrid API send failed for ${payload.to}: ${response.status} ${errorText}`);
+      return false;
+    } catch (error) {
+      this.logger.warn(
+        `SendGrid API send failed for ${payload.to}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   private async trySendViaResend(payload: {
     apiKey: string;
     from: string;
@@ -347,6 +407,17 @@ export class AuthService implements OnModuleInit {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private extractEmail(from: string): string {
+    const match = from.match(/<([^>]+)>/);
+    return (match?.[1] ?? from).trim();
+  }
+
+  private extractName(from: string): string | undefined {
+    const match = from.match(/^([^<]+)</);
+    const name = match?.[1]?.trim();
+    return name && name.length > 0 ? name : undefined;
   }
 }
 

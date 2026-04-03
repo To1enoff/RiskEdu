@@ -115,6 +115,9 @@ Required env:
 - `GEMINI_API_KEY=` (optional, for AI suggestions + syllabus AI fallback)
 - `GEMINI_MODEL=gemini-2.0-flash` (optional)
 - `GEMINI_SYLLABUS_MODEL=gemini-2.0-flash` (optional)
+- `SENDGRID_API_KEY=` (recommended for email delivery on Render)
+- `SENDGRID_FROM=no-reply@your-domain-or-verified-sender`
+- `SMTP_*` (optional fallback; often unreliable on free cloud instances)
 
 Verify:
 - `https://riskedu-backend.onrender.com/health`
