@@ -84,29 +84,30 @@ export const StudentCourse = () => {
   );
   const weightValid = Math.abs(totalWeight - 100) < 0.0001;
 
-  const showOpenAiStatusAlert = (status?: 'ai' | 'fallback_no_key' | 'fallback_error' | 'fallback_invalid_json', message?: string) => {
+  const showAiStatusAlert = (status?: 'ai' | 'fallback_no_key' | 'fallback_error' | 'fallback_invalid_json', message?: string) => {
     if (!status) return;
     if (status === 'ai') {
-      window.alert('OpenAI API key working: AI suggestions generated successfully.');
+      window.alert(message || 'Gemini API key working: AI suggestions generated successfully.');
       return;
     }
 
     const fallbackText =
-      status === 'fallback_no_key'
-        ? 'OPENAI_KEY is missing. Using fallback suggestions.'
+      message ??
+      (status === 'fallback_no_key'
+        ? 'GEMINI_API_KEY is missing. Using fallback suggestions.'
         : status === 'fallback_invalid_json'
-        ? 'OpenAI response was invalid. Using fallback suggestions.'
-        : 'AI request failed. Using fallback suggestions.';
+        ? 'Gemini response was invalid. Using fallback suggestions.'
+        : 'AI request failed. Using fallback suggestions.');
 
-    window.alert(`OpenAI API key status: ${fallbackText}${message ? `\nDetails: ${message}` : ''}`);
+    window.alert(`Gemini API key status: ${fallbackText}`);
   };
 
   const recalculateAndRefreshRisk = async () => {
     try {
       const prediction = await predictCourseRisk(id);
-      showOpenAiStatusAlert(prediction.aiSuggestionStatus, prediction.aiSuggestionMessage);
+      showAiStatusAlert(prediction.aiSuggestionStatus, prediction.aiSuggestionMessage);
     } catch (error) {
-      window.alert('Unable to refresh course risk or check OpenAI API status.');
+      window.alert('Unable to refresh course risk or check Gemini API status.');
     }
 
     await queryClient.invalidateQueries({ queryKey: ['course-risk', id] });

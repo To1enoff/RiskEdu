@@ -134,7 +134,7 @@ export class CoursesService {
     this.assertStudent(user);
     if (!file) throw new BadRequestException('Syllabus file is required');
     const course = await this.getStudentCourseOrThrow(courseId, user.sub);
-    const parsed = await parseSyllabusFile(file, process.env.OPENAI_KEY);
+    const parsed = await parseSyllabusFile(file, process.env.GEMINI_API_KEY);
     const title = parsed.title ?? course.title;
     const totalWeight = Object.values(parsed.weights).reduce((sum, value) => sum + value, 0);
 
@@ -699,7 +699,7 @@ function formatDateOnlyUtc(date: Date): string {
 
 async function parseSyllabusFile(
   file: Express.Multer.File,
-  openAiKey?: string,
+  geminiApiKey?: string,
 ): Promise<{ title?: string; weights: Record<CourseComponent, number> }> {
   const extension = (file.originalname.split('.').pop() ?? '').toLowerCase();
   let text = '';
@@ -741,7 +741,7 @@ async function parseSyllabusFile(
   const draftPercentTotal = Object.values(draftWeightsFromPercent).reduce((sum, value) => sum + value, 0);
 
   // AI fallback for difficult PDF table extraction cases.
-  const aiParsed = await parseSyllabusWithAi(text, openAiKey);
+  const aiParsed = await parseSyllabusWithAi(text, geminiApiKey);
   if (aiParsed) {
     return {
       title: aiParsed.title || title,
@@ -920,7 +920,7 @@ function round2(value: number) {
 
 async function parseSyllabusWithAi(
   text: string,
-  openAiKey?: string,
+  geminiApiKey?: string,
 ): Promise<
   | {
       title?: string;
@@ -928,50 +928,59 @@ async function parseSyllabusWithAi(
     }
   | null
 > {
-  if (!openAiKey) {
-    console.log('[syllabus-parser] AI fallback skipped: OPENAI_KEY is not set');
+  if (!geminiApiKey) {
+    console.log('[syllabus-parser] AI fallback skipped: GEMINI_API_KEY is not set');
     return null;
   }
   console.log('[syllabus-parser] AI fallback invoked');
   const snippet = text.slice(0, 12000);
   try {
-    const { data } = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
+    const requestBody = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: [
+                'Parse this syllabus text and map to course components.',
+                'Rules:',
+                '- Use percent column if present.',
+                '- If repeated rows (e.g., Quiz 1, Quiz 2), SUM them.',
+                '- Map practice/field work/homework/lab/attendance/participation to assignments.',
+                '- Return only one JSON object.',
+                '',
+                snippet,
+              ].join('\n'),
+            },
+          ],
+        },
+      ],
+      generationConfig: {
         temperature: 0,
-        response_format: { type: 'json_object' },
-        messages: [
+        responseMimeType: 'application/json',
+      },
+      systemInstruction: {
+        role: 'system',
+        parts: [
           {
-            role: 'system',
-            content:
-              'Extract grading components from syllabus text. Return strict JSON only with keys: title, midterm, final, quizzes, assignments, projects. Use numbers 0..100 (percent-like values). If missing, set 0.',
-          },
-          {
-            role: 'user',
-            content: [
-              'Parse this syllabus text and map to course components.',
-              'Rules:',
-              '- Use percent column if present.',
-              '- If repeated rows (e.g., Quiz 1, Quiz 2), SUM them.',
-              '- Map practice/field work/homework/lab/attendance/participation to assignments.',
-              '- Return only one JSON object.',
-              '',
-              snippet,
-            ].join('\n'),
+            text: 'Extract grading components from syllabus text. Return strict JSON only with keys: title, midterm, final, quizzes, assignments, projects. Use numbers 0..100 (percent-like values). If missing, set 0.',
           },
         ],
       },
+    };
+
+    const { data } = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      requestBody,
       {
         headers: {
-          Authorization: `Bearer ${openAiKey}`,
           'Content-Type': 'application/json',
         },
         timeout: 15_000,
       },
     );
 
-    const rawText = String(data?.choices?.[0]?.message?.content ?? '{}');
+    const rawText = String(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}');
     const parsed = JSON.parse(rawText) as Record<string, unknown>;
     console.log('[syllabus-parser] AI fallback succeeded');
     return {

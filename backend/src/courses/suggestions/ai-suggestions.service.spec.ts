@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AiSuggestionsService } from './ai-suggestions.service';
 
 describe('AiSuggestionsService', () => {
-  it('returns template suggestions without OPENAI_KEY', async () => {
+  it('returns template suggestions without GEMINI_API_KEY', async () => {
     const service = new AiSuggestionsService(new ConfigService({}));
 
     const result = await service.generate(

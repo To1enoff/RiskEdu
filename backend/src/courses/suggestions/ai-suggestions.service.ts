@@ -40,62 +40,111 @@ export class AiSuggestionsService {
     weightedPercent: number,
     context?: SuggestionsContext,
   ): Promise<SuggestionGenerationResult> {
-    const apiKey = this.configService.get<string>('OPENAI_KEY');
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (!apiKey) {
       return {
         suggestions: this.templateSuggestions(reasons, weightedPercent),
         status: 'fallback_no_key',
-        message: 'OPENAI_KEY is missing. Using fallback suggestions.',
+        message: 'GEMINI_API_KEY is missing. Using fallback suggestions.',
       };
     }
 
-    try {
-      const prompt = this.buildPrompt(courseTitle, reasons, weightedPercent, context);
+    const preferredModel = this.configService.get<string>('GEMINI_MODEL')?.trim() || 'gemini-1.5-flash';
+    const candidateModels = Array.from(new Set([preferredModel, 'gemini-1.5-flash', 'gemini-1.5-pro']));
 
-      const { data } = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-4o-mini',
-          temperature: 0.1,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are an academic advisor assistant. Return strictly valid JSON array only, no markdown.',
-            },
-            { role: 'user', content: prompt },
-          ],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
+    let lastErrorDetail = 'Unknown Gemini error';
+
+    for (const model of candidateModels) {
+      try {
+        const prompt = this.buildPrompt(courseTitle, reasons, weightedPercent, context);
+
+        const requestBody = {
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
           },
-          timeout: 10_000,
-        },
-      );
-
-      const rawText = String(data?.choices?.[0]?.message?.content ?? '[]');
-      const parsed = this.parseSuggestionsJson(rawText);
-      if (parsed.length === 0) {
-        return {
-          suggestions: this.templateSuggestions(reasons, weightedPercent),
-          status: 'fallback_invalid_json',
-          message: 'AI response was invalid. Using fallback suggestions.',
+          systemInstruction: {
+            role: 'system',
+            parts: [
+              {
+                text: 'You are an academic advisor assistant. Return strictly valid JSON array only, no markdown.',
+              },
+            ],
+          },
         };
+
+        const { data } = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          requestBody,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            timeout: 15_000,
+          },
+        );
+
+        const rawText = String(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '[]');
+        const parsed = this.parseSuggestionsJson(rawText);
+        if (parsed.length === 0) {
+          return {
+            suggestions: this.templateSuggestions(reasons, weightedPercent),
+            status: 'fallback_invalid_json',
+            message: `AI response invalid JSON (model=${model}). Using fallback suggestions.`,
+          };
+        }
+        return {
+          suggestions: parsed,
+          status: 'ai',
+          message: `AI suggestions generated successfully (model=${model}).`,
+        };
+      } catch (error) {
+        const detail = this.formatAxiosError(error);
+        lastErrorDetail = detail;
+
+        // If only the model is unavailable, try next model candidate.
+        if (detail.includes('model') || detail.includes('404')) {
+          continue;
+        }
+
+        break;
       }
-      return {
-        suggestions: parsed,
-        status: 'ai',
-        message: 'AI suggestions generated successfully.',
-      };
-    } catch {
-      return {
-        suggestions: this.templateSuggestions(reasons, weightedPercent),
-        status: 'fallback_error',
-        message: 'AI request failed. Using fallback suggestions.',
-      };
     }
+
+    console.warn(`[ai-suggestions] Gemini request failed: ${lastErrorDetail}`);
+    return {
+      suggestions: this.templateSuggestions(reasons, weightedPercent),
+      status: 'fallback_error',
+      message: `AI request failed: ${lastErrorDetail}. Using fallback suggestions.`,
+    };
+  }
+
+  private formatAxiosError(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const data = error.response?.data as
+        | {
+            error?: {
+              message?: string;
+              type?: string;
+              code?: string;
+              status?: string;
+            };
+          }
+        | undefined;
+      const code = data?.error?.code ?? error.code;
+      const type = data?.error?.type ?? data?.error?.status;
+      const message = data?.error?.message ?? error.message;
+      const statusText = status ? `status=${status}` : 'status=n/a';
+      return `${statusText}; code=${code ?? 'n/a'}; type=${type ?? 'n/a'}; message=${message ?? 'unknown'}`;
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return String(error);
   }
 
   private buildPrompt(
