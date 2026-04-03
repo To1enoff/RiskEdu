@@ -934,6 +934,7 @@ async function parseSyllabusWithAi(
   }
   console.log('[syllabus-parser] AI fallback invoked');
   const snippet = text.slice(0, 12000);
+  const syllabusModel = process.env.GEMINI_SYLLABUS_MODEL || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
   try {
     const requestBody = {
       contents: [
@@ -970,7 +971,7 @@ async function parseSyllabusWithAi(
     };
 
     const { data } = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${syllabusModel}:generateContent?key=${geminiApiKey}`,
       requestBody,
       {
         headers: {

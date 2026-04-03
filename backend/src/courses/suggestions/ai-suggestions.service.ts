@@ -49,8 +49,10 @@ export class AiSuggestionsService {
       };
     }
 
-    const preferredModel = this.configService.get<string>('GEMINI_MODEL')?.trim() || 'gemini-1.5-flash';
-    const candidateModels = Array.from(new Set([preferredModel, 'gemini-1.5-flash', 'gemini-1.5-pro']));
+    const preferredModel = this.configService.get<string>('GEMINI_MODEL')?.trim() || 'gemini-2.0-flash';
+    const candidateModels = Array.from(
+      new Set([preferredModel, 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash']),
+    );
 
     let lastErrorDetail = 'Unknown Gemini error';
 
