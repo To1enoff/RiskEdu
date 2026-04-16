@@ -48,6 +48,26 @@ export class AuthService implements OnModuleInit {
     if ((result.affected ?? 0) > 0) {
       this.logger.log(`Marked ${result.affected} legacy account(s) as emailVerified=true`);
     }
+
+    const legacyStudents = await this.usersRepository.find({
+      where: {
+        role: UserRole.STUDENT,
+      },
+    });
+
+    let linkedProfiles = 0;
+    for (const student of legacyStudents) {
+      if (student.studentProfileId) {
+        continue;
+      }
+
+      await this.ensureStudentProfile(student);
+      linkedProfiles += 1;
+    }
+
+    if (linkedProfiles > 0) {
+      this.logger.log(`Linked ${linkedProfiles} legacy student account(s) to a student profile`);
+    }
   }
 
   private isProduction(): boolean {
@@ -102,7 +122,8 @@ export class AuthService implements OnModuleInit {
   }
 
   async login(payload: LoginDto): Promise<{ accessToken: string; user: Partial<User> }> {
-    const user = await this.usersRepository.findOne({ where: { email: payload.email } });
+    const existingUser = await this.usersRepository.findOne({ where: { email: payload.email } });
+    const user = existingUser ? await this.ensureStudentProfile(existingUser) : null;
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -137,7 +158,8 @@ export class AuthService implements OnModuleInit {
   }
 
   async verifyEmail(payload: VerifyEmailDto): Promise<{ accessToken: string; user: Partial<User> }> {
-    const user = await this.usersRepository.findOne({ where: { email: payload.email } });
+    const existingUser = await this.usersRepository.findOne({ where: { email: payload.email } });
+    const user = existingUser ? await this.ensureStudentProfile(existingUser) : null;
     if (!user) {
       throw new BadRequestException('User not found');
     }
@@ -226,6 +248,22 @@ export class AuthService implements OnModuleInit {
       role: user.role,
       studentProfileId: user.studentProfileId,
     });
+  }
+
+  private async ensureStudentProfile(user: User): Promise<User> {
+    if (user.role !== UserRole.STUDENT || user.studentProfileId) {
+      return user;
+    }
+
+    const studentProfile = this.studentProfilesRepository.create({
+      externalStudentId: user.email,
+      fullName: user.fullName ?? user.email,
+      features: {},
+    });
+
+    const savedProfile = await this.studentProfilesRepository.save(studentProfile);
+    user.studentProfileId = savedProfile.id;
+    return this.usersRepository.save(user);
   }
 
   private async sendVerificationEmail(email: string, code: string) {
