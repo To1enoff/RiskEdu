@@ -8,6 +8,7 @@ import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { StudentCourse } from './pages/StudentCourse';
 import { StudentDashboard } from './pages/StudentDashboard';
+import { StudentDetails } from './pages/StudentDetails';
 import { useAuth } from './hooks/useAuth';
 
 const RoleDashboardRedirect = () => {
@@ -35,7 +36,9 @@ export default function App() {
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<RoleDashboardRedirect />} />
         <Route path="/student/dashboard" element={<StudentDashboard />} />
+        <Route path="/student/profile" element={<StudentDetails />} />
         <Route path="/student/courses/:id" element={<StudentCourse />} />
+        <Route path="/students/:id" element={<StudentDetails />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/students/:id" element={<AdminStudentDetails />} />
         <Route path="/analytics" element={<Analytics />} />

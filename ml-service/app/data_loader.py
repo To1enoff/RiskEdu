@@ -55,12 +55,13 @@ def load_training_data(dataset_path: Path) -> Tuple[pd.DataFrame, pd.Series]:
         if normalized_name in RAW_OR_INTERNAL_TO_KEY:
             rename_map[original_column] = RAW_OR_INTERNAL_TO_KEY[normalized_name]
             continue
-        if normalized_name in LABEL_CANDIDATES and label_column is None:
+        if (normalized_name in LABEL_CANDIDATES or normalized_name.startswith("label")) and label_column is None:
             label_column = original_column
 
     if label_column is None:
         for original_column in dataframe.columns:
-            if normalize_feature_key(str(original_column)) == "label":
+            normalized_name = normalize_feature_key(str(original_column))
+            if normalized_name == "label" or normalized_name.startswith("label"):
                 label_column = original_column
                 break
 

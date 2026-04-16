@@ -1,18 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { getStudentById } from '../api/students';
+import { getMyStudentProfile, getStudentById } from '../api/students';
 import { ExplainabilityChart } from '../components/student/ExplainabilityChart';
 import { RiskSummary } from '../components/student/RiskSummary';
 import { WhatIfPanel } from '../components/student/WhatIfPanel';
 import { Skeleton } from '../components/ui/Skeleton';
+import { useAuth } from '../hooks/useAuth';
 
 export const StudentDetails = () => {
   const { id = '' } = useParams();
+  const { user } = useAuth();
+  const isOwnProfileRoute = !id;
 
   const studentQuery = useQuery({
-    queryKey: ['student', id],
-    queryFn: () => getStudentById(id),
-    enabled: Boolean(id),
+    queryKey: ['student', isOwnProfileRoute ? user?.studentProfileId ?? 'me' : id],
+    queryFn: () => (isOwnProfileRoute ? getMyStudentProfile() : getStudentById(id)),
+    enabled: isOwnProfileRoute ? Boolean(user?.role === 'student') : Boolean(id),
   });
 
   if (studentQuery.isLoading) {
