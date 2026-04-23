@@ -33,6 +33,11 @@ RiskEdu/
   README.md
 ```
 
+## Documentation
+
+- Architecture diagrams: `docs/architecture-diagrams.md`
+- Thesis appendices: `docs/appendices.md`
+
 ## Dataset Layout
 
 Place data here:
