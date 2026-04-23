@@ -12,6 +12,9 @@ You can:
 This diagram shows the runtime flow when a user submits academic data and receives a risk prediction.
 
 ```mermaid
+---
+id: 744b48a5-7514-4b60-bf70-fab0311f5ddf
+---
 sequenceDiagram
     actor User
     participant Frontend as Frontend (React/Vite)
@@ -45,6 +48,9 @@ sequenceDiagram
 This diagram shows the main software modules and their dependencies.
 
 ```mermaid
+---
+id: 55cf6743-894c-4494-a3ee-b1a649eb5b4c
+---
 flowchart LR
     User[User]
     Frontend[Frontend UI<br/>React + TypeScript + Vite]
@@ -94,6 +100,9 @@ flowchart LR
 This diagram focuses on how data travels from the interface into storage and prediction components.
 
 ```mermaid
+---
+id: 62dbd0d7-d752-42ad-8abc-da12c30fb381
+---
 flowchart TD
     UserInput[User Input<br/>grades, absences, syllabus, exams]
     UI[Frontend UI]
