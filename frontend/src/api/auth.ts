@@ -1,4 +1,4 @@
-import { AuthResponse, RegisterResponse } from '../types';
+import { AuthResponse } from '../types';
 import { apiClient } from './client';
 
 export const login = async (email: string, password: string) => {
@@ -7,7 +7,7 @@ export const login = async (email: string, password: string) => {
 };
 
 export const register = async (email: string, password: string, fullName?: string) => {
-  const { data } = await apiClient.post<RegisterResponse>('/auth/register', {
+  const { data } = await apiClient.post<AuthResponse>('/auth/register', {
     email,
     password,
     fullName,

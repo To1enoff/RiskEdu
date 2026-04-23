@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { forgotPassword, login, register, resetPassword, verifyEmail } from '../api/auth';
+import { forgotPassword, login, register, resetPassword } from '../api/auth';
 import axios from 'axios';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -51,11 +51,10 @@ export const Login = () => {
   const navigate = useNavigate();
   const { setSession } = useAuth();
 
-  const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'forgot' | 'reset'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('student@riskedu.local');
   const [password, setPassword] = useState('StrongPass123');
   const [fullName, setFullName] = useState('Student User');
-  const [verificationCode, setVerificationCode] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
@@ -69,9 +68,6 @@ export const Login = () => {
       if (mode === 'register') {
         return register(email, password, fullName);
       }
-      if (mode === 'verify') {
-        return verifyEmail(email, verificationCode);
-      }
       if (mode === 'forgot') {
         return forgotPassword(email);
       }
@@ -79,11 +75,6 @@ export const Login = () => {
     },
     onSuccess: (result) => {
       setErrorMessage('');
-      if (mode === 'register') {
-        setMode('verify');
-        setInfoMessage('Verification code sent. Check your email and enter code below.');
-        return;
-      }
       if (mode === 'forgot') {
         setMode('reset');
         setInfoMessage('Reset code sent. Enter code and set new password.');
@@ -128,20 +119,18 @@ export const Login = () => {
             ? 'Welcome back'
             : mode === 'register'
               ? 'Create account'
-              : mode === 'verify'
-                ? 'Confirm email'
-                : mode === 'forgot'
+              : mode === 'forgot'
                   ? 'Forgot password'
-                  : 'Reset password'}
+                : 'Reset password'}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          {mode === 'verify'
-            ? 'Enter the 6-digit code sent to your email.'
-            : mode === 'forgot'
+          {mode === 'forgot'
               ? 'Enter your email to receive a reset code.'
               : mode === 'reset'
                 ? 'Enter reset code and new password.'
-            : 'Sign in to access student risk intelligence.'}
+                : mode === 'register'
+                  ? 'Create a student account with a valid email address.'
+                  : 'Sign in to access student risk intelligence.'}
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
@@ -149,14 +138,6 @@ export const Login = () => {
             <>
               <Input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Full name" />
             </>
-          )}
-          {mode === 'verify' && (
-            <Input
-              value={verificationCode}
-              onChange={(event) => setVerificationCode(event.target.value)}
-              placeholder="Verification code"
-              maxLength={6}
-            />
           )}
           {mode === 'reset' && (
             <>
@@ -192,9 +173,7 @@ export const Login = () => {
                 ? 'Login'
                 : mode === 'register'
                   ? 'Create account'
-                  : mode === 'verify'
-                    ? 'Confirm email'
-                    : mode === 'forgot'
+                  : mode === 'forgot'
                       ? 'Send reset code'
                       : 'Reset password'}
           </Button>
@@ -231,7 +210,7 @@ export const Login = () => {
             Forgot password?
           </button>
         )}
-        {(mode === 'verify' || mode === 'forgot' || mode === 'reset') && (
+        {(mode === 'forgot' || mode === 'reset') && (
           <button
             type="button"
             onClick={() => {

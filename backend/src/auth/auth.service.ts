@@ -70,13 +70,7 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  private isProduction(): boolean {
-    return this.configService.get<string>('NODE_ENV') === 'production';
-  }
-
-  async register(
-    payload: RegisterDto,
-  ): Promise<{ requiresVerification: true; email: string; message: string }> {
+  async register(payload: RegisterDto): Promise<{ accessToken: string; user: Partial<User> }> {
     const allowedAdminEmail = (this.configService.get<string>('ADMIN_EMAIL') ?? 'admin@riskedu.local').toLowerCase();
     if (payload.email.toLowerCase() === allowedAdminEmail) {
       throw new ForbiddenException('This email is reserved for admin access');
@@ -94,9 +88,9 @@ export class AuthService implements OnModuleInit {
       // Public self-registration is strictly student-only.
       role: UserRole.STUDENT,
       fullName: payload.fullName,
-      emailVerified: false,
-      emailVerificationCode: generateVerificationCode(),
-      emailVerificationExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      emailVerified: true,
+      emailVerificationCode: undefined,
+      emailVerificationExpiresAt: undefined,
     });
 
     const studentProfile = this.studentProfilesRepository.create({
@@ -108,16 +102,16 @@ export class AuthService implements OnModuleInit {
     user.studentProfileId = savedProfile.id;
 
     const savedUser = await this.usersRepository.save(user);
-    if (!this.isProduction()) {
-      this.logger.log(`[auth] Verification code for ${savedUser.email}: ${savedUser.emailVerificationCode}`);
-    }
-
-    await this.sendVerificationEmail(savedUser.email, savedUser.emailVerificationCode ?? '');
-
+    const accessToken = await this.createAccessToken(savedUser);
     return {
-      requiresVerification: true,
-      email: savedUser.email,
-      message: 'Verification code sent to email',
+      accessToken,
+      user: {
+        id: savedUser.id,
+        email: savedUser.email,
+        role: savedUser.role,
+        fullName: savedUser.fullName,
+        studentProfileId: savedUser.studentProfileId,
+      },
     };
   }
 
